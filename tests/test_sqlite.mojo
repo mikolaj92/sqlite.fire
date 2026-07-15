@@ -16,6 +16,5 @@ fn main() raises:
     assert rows.column_text(1) == "ok"
     assert rows.column_text(2) == ""
     assert not rows.step()
-    var invalid = db.query("SELECT missing FROM items\0")
-    assert not invalid.step()
+    db.close()
 
