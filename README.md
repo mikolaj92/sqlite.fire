@@ -100,18 +100,21 @@ używane po zamknięciu właścicielskiej bazy.
 
 Poniższe elementy są świadomie niewystawione albo wymagają dalszej pracy:
 
-1. **Callbacki Mojo → C.** Aktualny toolchain Mojo nie daje zweryfikowanej, bezpiecznej
-   konwersji funkcji Mojo do adresu callbacku C. Dlatego callbacki są dostępne przez
-   natywny C ABI, ale nie jako fałszywe API Mojo.
+1. **Callbacki Mojo → C.** Zweryfikowane z `Mojo 1.0.0b3.dev2026071505` (`236eccec`):
+   `def(... ) thin abi("C")` działa jako typ funkcji importowanej z biblioteki, ale
+   przekazanie funkcji Mojo do tego typu nie działa bezpiecznie. Wariant bez `thin`
+   odrzuca konwersję podczas kompilacji, `escaping` jest odrzucone przez parser, a
+   wywołanie funkcji eksportowanej jako callback kończy się crashem. Dlatego callbacki
+   są dostępne przez natywny C ABI, ale nie jako API Mojo.
 2. **Mojo scalar/window/aggregate functions.** Rejestracja funkcji użytkownika z Mojo
    wymaga rozwiązania problemu callbacków z punktu 1.
 3. **Własny VFS z implementacją I/O w Mojo/C.** Dostępny jest stabilny passthrough VFS
    delegujący do istniejącego VFS; arbitralne implementacje `sqlite3_io_methods` nie są
    jeszcze częścią publicznego API.
-4. **Ładowanie rozszerzeń SQLite.** Na obecnym buildzie SQLite i przez aktualny ABI Mojo
-   wywołanie opcjonalnego mechanizmu jest niestabilne. `enable_load_extension(False)`
-   zachowuje bezpieczny stan wyłączony, a próba włączenia zgłasza typowany błąd zamiast
-   powodować crash.
+4. **Ładowanie rozszerzeń SQLite.** Zweryfikowane z tym samym nightly: zwykły `sf_*`
+   bridge może otworzyć bazę, ale ścieżka `enable_load_extension(True)` nadal powoduje
+   crash w runtime Mojo. Publiczne API pozostaje więc celowo wyłączone; `False` jest
+   bezpieczne, a `load_extension()` zgłasza `SQLITE_MISUSE`, gdy ładowanie jest wyłączone.
 5. **Portability CI.** Należy dodać stałą walidację Linux oraz ASan/UBSan do CI, gdy
    środowiska tych narzędzi będą dostępne. Lokalnie wykonywane są natywne testy strict
    compilation i testy C; testy sanitizerów nie są obecnie częścią gwarantowanego CI.
