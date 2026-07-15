@@ -72,6 +72,7 @@ struct Connection(Movable):
         var result = self._close(self._db)
         if result != SQLITE_OK:
             raise Error(self._error())
+        self._db = DbPtr()
 
 
     fn _error(self) -> String:
