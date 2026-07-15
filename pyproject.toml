@@ -18,6 +18,7 @@ dev = [
 [tool.uv]
 package = false
 
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

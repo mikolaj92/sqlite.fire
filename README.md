@@ -20,25 +20,33 @@ uv sync --dev
 - `src/sqlite_fire/sqlite.mojo` — publiczny wrapper Mojo.
 ## Uruchomienie
 
-```sh
 make -C native
-uv run mojo build examples/basic.mojo -I src -o /tmp/sqlite-fire-example \
-  -Xlinker -Lnative -Xlinker -lsqlite_fire
-DYLD_LIBRARY_PATH=native /tmp/sqlite-fire-example  # macOS
-```
+uv run mojo run examples/basic.mojo -I src
 
 Test kontraktu:
 
 ```sh
-uv run mojo build tests/test_sqlite.mojo -I src -o /tmp/sqlite-fire-test \
-  -Xlinker -Lnative -Xlinker -lsqlite_fire
-DYLD_LIBRARY_PATH=native /tmp/sqlite-fire-test
+uv run mojo run tests/test_sqlite.mojo -I src
+```
+
+Alternatywnie z lokalnym `make`:
+
+```sh
+make -C native
+uv run mojo run examples/basic.mojo -I src
+uv run mojo run tests/test_sqlite.mojo -I src
 ```
 
 Biblioteka ładuje `native/libsqlite_fire.dylib` na macOS. Na Linuxie należy
 zbudować `libsqlite_fire.so` i ustawić `LD_LIBRARY_PATH=native`.
 
+`Connection` i `Statement` są właścicielami zasobów. Statement należy zużyć przez
+`step()` do końca albo pozwolić mu wyjść poza zakres przed zamknięciem połączenia.
+`Connection.close()` pozwala jawnie zamknąć połączenie; destruktor zamyka je
+automatycznie. SQLite odracza fizyczne zamknięcie do zwolnienia aktywnych statementów.
+
 API obejmuje `Connection.execute`, `Connection.query`, `Statement.step` oraz
-odczyt liczby, tekstu, typu i nazwy kolumn. Parametry zapytań i BLOB-y nie są
-jeszcze częścią tego małego ABI.
+odczyt liczby, tekstu, typu i nazwy kolumn. `NULL` jest raportowany jako typ
+`SQLITE_NULL`, a `column_text` zwraca pusty tekst dla wartości NULL.
+Parametry zapytań i BLOB-y nie są jeszcze częścią tego małego ABI.
 

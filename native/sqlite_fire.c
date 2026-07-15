@@ -12,7 +12,7 @@ struct sf_stmt {
 };
 
 int sf_open(const char *filename, sf_db **out_db) {
-    if (out_db == NULL) {
+    if (filename == NULL || out_db == NULL) {
         return SQLITE_MISUSE;
     }
     *out_db = NULL;
@@ -22,7 +22,12 @@ int sf_open(const char *filename, sf_db **out_db) {
         return SQLITE_NOMEM;
     }
 
-    int result = sqlite3_open(filename, &db->handle);
+    int result = sqlite3_open_v2(
+        filename,
+        &db->handle,
+        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI,
+        NULL
+    );
     if (result != SQLITE_OK) {
         sqlite3_close(db->handle);
         free(db);
@@ -37,10 +42,8 @@ int sf_close(sf_db *db) {
     if (db == NULL) {
         return SQLITE_OK;
     }
-    int result = sqlite3_close(db->handle);
-    if (result == SQLITE_OK) {
-        free(db);
-    }
+    int result = sqlite3_close_v2(db->handle);
+    free(db);
     return result;
 }
 

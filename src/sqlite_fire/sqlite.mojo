@@ -4,11 +4,11 @@ from std.ffi import CStringSlice, OwnedDLHandle, c_int, c_long_long
 from std.memory import MutUnsafePointer, alloc
 from std.sys import CompilationTarget
 
-# SQLite return codes and column types.
 comptime SQLITE_OK: Int32 = 0
 comptime SQLITE_ROW: Int32 = 100
 comptime SQLITE_DONE: Int32 = 101
 comptime SQLITE_INTEGER: Int32 = 1
+comptime SQLITE_NULL: Int32 = 5
 comptime SQLITE_TEXT: Int32 = 3
 
 # These are opaque pointers owned by the C bridge. AnyOrigin is used here
@@ -40,10 +40,6 @@ comptime ColumnTextFn = fn(StmtPtr, c_int) -> CStr
 fn _cstring(value: String) raises -> CStringSlice[origin_of(value)]:
     return CStringSlice(StringSlice(value))
 
-fn _check(result: Int32, operation: String) raises:
-    if result != SQLITE_OK:
-        raise Error(operation)
-
 struct Connection(Movable):
     """An owned SQLite connection."""
 
@@ -72,6 +68,12 @@ struct Connection(Movable):
     fn __del__(deinit self):
         _ = self._close(self._db)
 
+    fn close(mut self) raises:
+        var result = self._close(self._db)
+        if result != SQLITE_OK:
+            raise Error(self._error())
+
+
     fn _error(self) -> String:
         return String(unsafe_from_utf8_ptr=self._errmsg(self._db))
 
@@ -97,7 +99,6 @@ struct Connection(Movable):
 
         var stmt = holder[]
         holder.free()
-
         return Statement(stmt)
 
 struct Statement(Movable):
@@ -150,4 +151,8 @@ struct Statement(Movable):
 
     fn column_text(self, index: Int) -> String:
         var ptr = self._column_text(self._stmt, c_int(index))
+        if ptr == CStr():
+            return ""
         return String(unsafe_from_utf8_ptr=ptr)
+
+
