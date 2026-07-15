@@ -5,9 +5,9 @@ channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
 platforms = ["osx-arm64", "linux-64"]
 
 [tasks]
-smoke = "make -C native && mojo run examples/basic.mojo"
-test = "make -C native && mojo run tests/test_sqlite.mojo"
+smoke = "make -C native && mojo run -I src examples/basic.mojo"
+test = "make -C native && mojo run -I src tests/test_sqlite.mojo"
 
 [dependencies]
-mojo = ">=0.26.2"
+mojo = ">=1.0.0b2,<1.0.0b3"
 sqlite = ">=3.51"

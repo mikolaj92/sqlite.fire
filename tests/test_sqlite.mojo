@@ -1,6 +1,6 @@
 from sqlite_fire.sqlite import Connection, SQLITE_INTEGER, SQLITE_NULL, SQLITE_TEXT
 
-fn main() raises:
+def main() raises:
     var db = Connection(":memory:\0")
     db.execute("CREATE TABLE items (id INTEGER, label TEXT, missing TEXT)\0")
     db.execute("INSERT INTO items VALUES (7, 'ok', NULL)\0")
