@@ -1,0 +1,23 @@
+[project]
+name = "sqlite-fire"
+version = "0.1.0"
+description = "Direct SQLite access from Mojo"
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [
+    { name = "mikolaj92" }
+]
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "mojo-compiler>=0.26.2",
+    "pytest>=8.0",
+]
+
+[tool.uv]
+package = false
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
