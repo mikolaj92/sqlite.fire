@@ -10,6 +10,7 @@ trap cleanup EXIT HUP INT TERM
 
 cd "$ROOT"
 make -C native strict-test
+make -B -C native all
 
 case "$(uname -s)" in
     Darwin)
