@@ -1,5 +1,4 @@
 """Small, direct SQLite wrapper for Mojo."""
-
 from std.collections import List
 from std.ffi import CStringSlice, OwnedDLHandle, c_double, c_int, c_long_long
 from std.memory import MutUnsafePointer, alloc
@@ -31,6 +30,28 @@ def _checked_c_int(value: Int, message: String, code: Int = Int(SQLITE_RANGE)) r
     if value < 0 or value > C_INT_MAX:
         raise SQLiteError(code=code, message=message)
     return c_int(value)
+def _validate_savepoint_name(name: String) raises SQLiteError:
+    if name.byte_length() == 0:
+        raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: savepoint name must not be empty")
+    var bytes = name.as_bytes()
+    var pointer = bytes.unsafe_ptr()
+    var i = 0
+    while i < name.byte_length():
+        var value = (pointer + i).load()
+        var first = i == 0
+        var letter = (value >= 65 and value <= 90) or (value >= 97 and value <= 122) or value == 95
+        var digit = value >= 48 and value <= 57
+        if value == 0 or (not letter and (first or not digit)):
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: savepoint name must be an ASCII identifier")
+        i += 1
+
+def _savepoint_sql(prefix: String, name: String) raises SQLiteError -> String:
+    _validate_savepoint_name(name)
+    var sql = prefix
+    sql += "\""
+    sql += name
+    sql += "\""
+    return sql
 
 @fieldwise_init
 struct OpenOptions(Copyable, Writable):
@@ -83,6 +104,53 @@ struct SQLiteValue(Movable, Writable):
 
     def is_null(self) -> Bool:
         return self.kind == Int(SQLITE_NULL)
+struct Row(Movable):
+    """An owned snapshot of the current statement row.
+
+    Values and column names are copied, so the row remains valid after the
+    statement advances or closes.
+    """
+    var _values: List[SQLiteValue]
+    var _names: List[String]
+
+    def __init__(out self, var values: List[SQLiteValue], var names: List[String]):
+        self._values = values^
+        self._names = names^
+
+    def count(self) -> Int:
+        return len(self._values)
+    def name(self, index: Int) raises SQLiteError -> String:
+        if index < 0 or index >= self.count():
+            raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: row column index out of range")
+        return self._names[index]
+    def value(self, index: Int) raises SQLiteError -> SQLiteValue:
+        if index < 0 or index >= self.count():
+            raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: row column index out of range")
+        return self._values[index].copy()
+    def value_by_name(self, name: String) raises SQLiteError -> SQLiteValue:
+        var i = 0
+        while i < self.count():
+            if self._names[i] == name:
+                return self.value(i)
+            i += 1
+        raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: row column name not found")
+
+struct Savepoint(Movable):
+    """A validated savepoint token managed by a ``Connection``."""
+    var _name: String
+    var _active: Bool
+
+    def __init__(out self, name: String) raises SQLiteError:
+        _validate_savepoint_name(name)
+        self._name = name
+        self._active = True
+
+    def name(self) -> String:
+        return self._name
+
+    def _ensure_active(self) raises SQLiteError:
+        if not self._active:
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: savepoint is released")
 @fieldwise_init
 struct SQLiteError(Copyable, Writable):
     var code: Int
@@ -398,6 +466,46 @@ struct Connection(Movable):
         var stmt = holder[]
         holder.free()
         return Statement(stmt)
+    def fetch_all(mut self, sql: String) raises SQLiteError -> List[Row]:
+        """Fetch and own every result row from a query."""
+        var statement = self.query(sql)
+        var result = List[Row]()
+        while statement.step():
+            result.append(statement.row())
+        statement.close()
+        return result^
+
+    def fetch_one(mut self, sql: String) raises SQLiteError -> Row:
+        """Fetch one owned result row or raise ``SQLITE_NOTFOUND``."""
+        var statement = self.query(sql)
+        if not statement.step():
+            statement.close()
+            raise SQLiteError(code=Int(SQLITE_NOTFOUND), message="sqlite.fire: query returned no rows")
+        var result = statement.row()
+        statement.close()
+        return result^
+
+    def fetch_value(mut self, sql: String) raises SQLiteError -> SQLiteValue:
+        """Fetch the first column of one result row."""
+        var row = self.fetch_one(sql)
+        if row.count() == 0:
+            raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: query returned no columns")
+        return row.value(0)
+    def savepoint(mut self, name: String) raises SQLiteError -> Savepoint:
+        """Create a savepoint after validating its identifier."""
+        self.execute(_savepoint_sql("SAVEPOINT ", name))
+        return Savepoint(name)
+
+    def rollback_to(mut self, mut point: Savepoint) raises SQLiteError:
+        """Roll back changes made after a savepoint without releasing it."""
+        point._ensure_active()
+        self.execute(_savepoint_sql("ROLLBACK TO ", point._name))
+
+    def release(mut self, mut point: Savepoint) raises SQLiteError:
+        """Release a savepoint and make its token unusable."""
+        point._ensure_active()
+        self.execute(_savepoint_sql("RELEASE ", point._name))
+        point._active = False
 
 struct Statement(Movable):
     var _library: OwnedDLHandle
@@ -589,6 +697,30 @@ struct Statement(Movable):
 
     def column_decltype(self, index: Int) raises SQLiteError -> String:
         return self._metadata(index, self._column_decltype)
+
+    def column_index(self, name: String) raises SQLiteError -> Int:
+        """Return the first result-column index matching ``name``."""
+        self._ensure_open()
+        var i = 0
+        var count = self.column_count()
+        while i < count:
+            if self.column_name(i) == name:
+                return i
+            i += 1
+        raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: column name not found")
+
+    def row(self) raises SQLiteError -> Row:
+        """Copy the current result row and its column names."""
+        self._ensure_open()
+        var values = List[SQLiteValue]()
+        var names = List[String]()
+        var i = 0
+        var count = self.column_count()
+        while i < count:
+            names.append(self.column_name(i))
+            values.append(self.column_value(i))
+            i += 1
+        return Row(values^, names^)
 
     def reset(mut self) raises SQLiteError:
         self._ensure_open()

@@ -53,8 +53,12 @@ automatycznie.
 - `SQLiteError` z kodem SQLite i komunikatem;
 - `OpenOptions` dla `sqlite3_open_v2` oraz wyboru VFS;
 - `SQLiteValue` dla SQL `NULL`, INTEGER, REAL, TEXT i BLOB;
+- `Row` jako posiadana kopia bieżącego wiersza z dostępem po indeksie i nazwie;
 - prepared statements, bindingi pozycyjne i nazwane, `bind_value()`/`column_value()`,
   `reset()` oraz `clear_bindings()`;
+- walidowane `Savepoint` z `savepoint()`, `rollback_to()` i `release()`;
+- wysokopoziomowe `fetch_all()`, `fetch_one()` i `fetch_value()` zwracające posiadane
+  kopie wyników; brak wiersza w `fetch_one()` zgłasza `SQLITE_NOTFOUND`;
 - odczyt typów, kolumn, metadanych zapytania i kopii danych BLOB;
 - transakcje (`begin`, `begin_immediate`, `begin_exclusive`, `commit`, `rollback`),
   autocommit, changes, last-insert-rowid, total changes i busy timeout;
