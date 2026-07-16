@@ -68,7 +68,7 @@ typedef int (*sf_wal_fn)(void *userdata, sqlite3 *database, const char *name, in
 typedef int (*sf_busy_fn)(void *userdata, int attempts);
 /* Opaque lifecycle tokens for safely owned scalar and collation registrations. */
 typedef struct sf_callback_token sf_callback_token;
-/* Closing is idempotent and releases the token allocation. */
+/* Closing is idempotent; the token remains a safe opaque tombstone after close. */
 int sf_callback_token_close(sf_callback_token *token);
 int sf_register_scalar_function(sf_db *db, const char *name, int argument_count,
                                 int text_encoding, sf_scalar_fn callback,

@@ -444,13 +444,6 @@ int sf_callback_token_close(sf_callback_token *token) {
     }
     token->callback.scalar = NULL;
     token->db = NULL;
-    if (db != NULL) {
-        sf_callback_token **cursor = &db->callback_tokens;
-        while (*cursor != NULL && *cursor != token) cursor = &(*cursor)->next;
-        if (*cursor == token) *cursor = token->next;
-    }
-    free(token->name);
-    free(token);
     return result;
 }
 int sf_create_collation(sf_db *db, const char *name, int text_encoding, sf_collation_fn callback, void *userdata) {
