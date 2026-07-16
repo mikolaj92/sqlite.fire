@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <pthread.h>
 #if defined(__APPLE__) || defined(__linux__)
 #include <dlfcn.h>
 #endif
@@ -26,6 +28,8 @@ struct sf_vfs {
     char *name;
     int registered;
     unsigned active;
+    unsigned inflight;
+    pthread_mutex_t mutex;
 };
 struct sf_file_entry {
     struct sf_vfs *owner;
@@ -39,8 +43,12 @@ static int sf_vfs_xClose(sqlite3_file *file) {
     const sqlite3_io_methods *original = entry->original;
     sf_vfs *owner = entry->owner;
     file->pMethods = original;
-    int result = original->xClose != NULL ? original->xClose(file) : SQLITE_OK;
-    if (owner != NULL && owner->active > 0) --owner->active;
+    int result = original != NULL && original->xClose != NULL ? original->xClose(file) : SQLITE_OK;
+    if (owner != NULL) {
+        (void)pthread_mutex_lock(&owner->mutex);
+        if (owner->active > 0) --owner->active;
+        (void)pthread_mutex_unlock(&owner->mutex);
+    }
     free(entry);
     return result;
 }
@@ -55,15 +63,24 @@ static sqlite3_vfs *sf_vfs_base(sqlite3_vfs *vfs) {
 #define SF_VFS_BASE(name) sqlite3_vfs *base = sf_vfs_base(vfs); if (base == NULL || base->name == NULL) return SQLITE_NOTFOUND
 static int sf_vfs_xOpen(sqlite3_vfs *vfs, sqlite3_filename n, sqlite3_file *f, int flags, int *out) {
     SF_VFS_BASE(xOpen);
+    sf_vfs *owner = sf_vfs_from(vfs);
+    if (owner == NULL) return SQLITE_MISUSE;
+    (void)pthread_mutex_lock(&owner->mutex);
+    ++owner->inflight;
     int result = base->xOpen(base, n, f, flags, out);
-    if (result != SQLITE_OK || f == NULL || f->pMethods == NULL) return result;
-    struct sf_vfs *owner = sf_vfs_from(vfs);
+    if (result != SQLITE_OK || f == NULL || f->pMethods == NULL) {
+        --owner->inflight;
+        (void)pthread_mutex_unlock(&owner->mutex);
+        return result;
+    }
     struct sf_file_entry *entry = (struct sf_file_entry *)calloc(1, sizeof(*entry));
     if (entry == NULL) {
         const sqlite3_io_methods *original = f->pMethods;
         f->pMethods = original;
         if (original->xClose != NULL) original->xClose(f);
         f->pMethods = NULL;
+        --owner->inflight;
+        (void)pthread_mutex_unlock(&owner->mutex);
         return SQLITE_NOMEM;
     }
     entry->owner = owner;
@@ -73,6 +90,8 @@ static int sf_vfs_xOpen(sqlite3_vfs *vfs, sqlite3_filename n, sqlite3_file *f, i
     entry->methods.xClose = sf_vfs_xClose;
     f->pMethods = &entry->methods;
     ++owner->active;
+    --owner->inflight;
+    (void)pthread_mutex_unlock(&owner->mutex);
     return result;
 }
 static int sf_vfs_xDelete(sqlite3_vfs *vfs, const char *n, int sync) { SF_VFS_BASE(xDelete); return base->xDelete(base, n, sync); }
@@ -100,9 +119,10 @@ int sf_vfs_register_passthrough(const char *name, const char *base_name, int mak
     if (base == NULL) return SQLITE_NOTFOUND;
     sf_vfs *wrapper = (sf_vfs *)calloc(1, sizeof(*wrapper));
     if (wrapper == NULL) return SQLITE_NOMEM;
+    if (pthread_mutex_init(&wrapper->mutex, NULL) != 0) { free(wrapper); return SQLITE_NOMEM; }
     size_t name_len = strlen(name) + 1;
     wrapper->name = (char *)malloc(name_len);
-    if (wrapper->name == NULL) { free(wrapper); return SQLITE_NOMEM; }
+    if (wrapper->name == NULL) { pthread_mutex_destroy(&wrapper->mutex); free(wrapper); return SQLITE_NOMEM; }
     memcpy(wrapper->name, name, name_len);
     wrapper->base = base;
     wrapper->vfs.iVersion = base->iVersion;
@@ -122,14 +142,14 @@ int sf_vfs_register_passthrough(const char *name, const char *base_name, int mak
     wrapper->vfs.xSleep = sf_vfs_xSleep;
     wrapper->vfs.xCurrentTime = sf_vfs_xCurrentTime;
     wrapper->vfs.xGetLastError = sf_vfs_xGetLastError;
-    if (wrapper->vfs.iVersion >= 2) wrapper->vfs.xCurrentTimeInt64 = sf_vfs_xCurrentTimeInt64;
+    if (wrapper->vfs.iVersion >= 2 && base->xCurrentTimeInt64 != NULL) wrapper->vfs.xCurrentTimeInt64 = sf_vfs_xCurrentTimeInt64;
     if (wrapper->vfs.iVersion >= 3) {
-        wrapper->vfs.xSetSystemCall = sf_vfs_xSetSystemCall;
-        wrapper->vfs.xGetSystemCall = sf_vfs_xGetSystemCall;
-        wrapper->vfs.xNextSystemCall = sf_vfs_xNextSystemCall;
+        if (base->xSetSystemCall != NULL) wrapper->vfs.xSetSystemCall = sf_vfs_xSetSystemCall;
+        if (base->xGetSystemCall != NULL) wrapper->vfs.xGetSystemCall = sf_vfs_xGetSystemCall;
+        if (base->xNextSystemCall != NULL) wrapper->vfs.xNextSystemCall = sf_vfs_xNextSystemCall;
     }
     int result = sqlite3_vfs_register(&wrapper->vfs, make_default != 0);
-    if (result != SQLITE_OK) { free(wrapper->name); free(wrapper); return result; }
+    if (result != SQLITE_OK) { free(wrapper->name); pthread_mutex_destroy(&wrapper->mutex); free(wrapper); return result; }
     wrapper->registered = 1;
     *out_vfs = wrapper;
     return SQLITE_OK;
@@ -138,11 +158,16 @@ int sf_vfs_register_passthrough(const char *name, const char *base_name, int mak
 int sf_vfs_unregister(sf_vfs *wrapper) {
     if (wrapper == NULL) return SQLITE_MISUSE;
     if (!wrapper->registered) return SQLITE_OK;
-    if (wrapper->active != 0) return SQLITE_MISUSE;
+    (void)pthread_mutex_lock(&wrapper->mutex);
+    unsigned active = wrapper->active;
+    unsigned inflight = wrapper->inflight;
+    (void)pthread_mutex_unlock(&wrapper->mutex);
+    if (active != 0 || inflight != 0) return SQLITE_MISUSE;
     int result = sqlite3_vfs_unregister(&wrapper->vfs);
     if (result == SQLITE_OK) {
         wrapper->registered = 0;
         free(wrapper->name);
+        pthread_mutex_destroy(&wrapper->mutex);
         free(wrapper);
     }
     return result;
@@ -195,17 +220,21 @@ int sf_close(sf_db *db) {
     return result;
 }
 
-const char *sf_errmsg(sf_db *db) { return db == NULL ? "sqlite.fire: null database" : sqlite3_errmsg(db->handle); }
-int sf_errcode(sf_db *db) { return db == NULL ? SQLITE_MISUSE : sqlite3_errcode(db->handle); }
-int sf_extended_errcode(sf_db *db) { return db == NULL ? SQLITE_MISUSE : sqlite3_extended_errcode(db->handle); }
-int sf_changes(sf_db *db) { return db == NULL ? 0 : sqlite3_changes(db->handle); }
-long long sf_last_insert_rowid(sf_db *db) { return db == NULL ? 0 : sqlite3_last_insert_rowid(db->handle); }
+const char *sf_errmsg(sf_db *db) {
+    if (db == NULL) return "sqlite.fire: null database";
+    if (db->handle == NULL) return "sqlite.fire: database is closed";
+    return sqlite3_errmsg(db->handle);
+}
+int sf_errcode(sf_db *db) { return db == NULL || db->handle == NULL ? SQLITE_MISUSE : sqlite3_errcode(db->handle); }
+int sf_extended_errcode(sf_db *db) { return db == NULL || db->handle == NULL ? SQLITE_MISUSE : sqlite3_extended_errcode(db->handle); }
+int sf_changes(sf_db *db) { return db == NULL || db->handle == NULL ? 0 : sqlite3_changes(db->handle); }
+long long sf_last_insert_rowid(sf_db *db) { return db == NULL || db->handle == NULL ? 0 : sqlite3_last_insert_rowid(db->handle); }
 int sf_total_changes(sf_db *db) { return db == NULL || db->handle == NULL ? 0 : sqlite3_total_changes(db->handle); }
-int sf_autocommit(sf_db *db) { return db == NULL ? 1 : sqlite3_get_autocommit(db->handle); }
-int sf_busy_timeout(sf_db *db, int milliseconds) { return db == NULL ? SQLITE_MISUSE : sqlite3_busy_timeout(db->handle, milliseconds); }
+int sf_autocommit(sf_db *db) { return db == NULL || db->handle == NULL ? 1 : sqlite3_get_autocommit(db->handle); }
+int sf_busy_timeout(sf_db *db, int milliseconds) { return db == NULL || db->handle == NULL ? SQLITE_MISUSE : sqlite3_busy_timeout(db->handle, milliseconds); }
 
 int sf_exec(sf_db *db, const char *sql) {
-    if (db == NULL || sql == NULL) return SQLITE_MISUSE;
+    if (db == NULL || db->handle == NULL || sql == NULL) return SQLITE_MISUSE;
     return sqlite3_exec(db->handle, sql, NULL, NULL, NULL);
 }
 
@@ -229,7 +258,7 @@ static const char *skip_tail(const char *tail) {
 }
 
 int sf_prepare(sf_db *db, const char *sql, sf_stmt **out_stmt) {
-    if (db == NULL || sql == NULL || out_stmt == NULL) return SQLITE_MISUSE;
+    if (db == NULL || db->handle == NULL || sql == NULL || out_stmt == NULL) return SQLITE_MISUSE;
     *out_stmt = NULL;
     sqlite3_stmt *handle = NULL;
     const char *tail = NULL;
@@ -404,14 +433,25 @@ int sf_register_collation(sf_db *db, const char *name, int text_encoding,
 }
 int sf_callback_token_close(sf_callback_token *token) {
     if (token == NULL || !token->active) return SQLITE_OK;
-    sf_db *db = token->db; int result = SQLITE_OK; token->active = 0;
+    sf_db *db = token->db;
+    int result = SQLITE_OK;
+    token->active = 0;
     if (db != NULL && db->handle != NULL) {
         if (token->kind == SF_TOKEN_SCALAR)
             result = sqlite3_create_function_v2(db->handle, token->name, token->argument_count, token->text_encoding, NULL, NULL, NULL, NULL, NULL);
         else if (token->kind == SF_TOKEN_COLLATION)
             result = sqlite3_create_collation_v2(db->handle, token->name, token->text_encoding, NULL, NULL, NULL);
     }
-    token->callback.scalar = NULL; token->db = NULL; return result;
+    token->callback.scalar = NULL;
+    token->db = NULL;
+    if (db != NULL) {
+        sf_callback_token **cursor = &db->callback_tokens;
+        while (*cursor != NULL && *cursor != token) cursor = &(*cursor)->next;
+        if (*cursor == token) *cursor = token->next;
+    }
+    free(token->name);
+    free(token);
+    return result;
 }
 int sf_create_collation(sf_db *db, const char *name, int text_encoding, sf_collation_fn callback, void *userdata) {
     if (db == NULL || db->handle == NULL || name == NULL || name[0] == '\0' || callback == NULL) return SQLITE_MISUSE;
@@ -588,6 +628,26 @@ void *sf_serialize(sf_db *db, const char *schema, size_t *size, unsigned int fla
     void *data = sqlite3_serialize(db->handle, schema, &n, flags);
     if (n >= 0) *size = (size_t)n;
     return data;
+}
+int sf_serialize_status(sf_db *db, const char *schema, size_t *size,
+                         unsigned int flags, void **out_data) {
+    if (size != NULL) *size = 0;
+    if (out_data != NULL) *out_data = NULL;
+    if (db == NULL || db->handle == NULL || schema == NULL || schema[0] == '\0' ||
+        size == NULL || out_data == NULL) return SQLITE_MISUSE;
+    sqlite3_int64 n = 0;
+    void *data = sqlite3_serialize(db->handle, schema, &n, flags);
+    if (data == NULL) {
+        int result = sqlite3_errcode(db->handle);
+        return result == SQLITE_OK ? SQLITE_NOMEM : result;
+    }
+    if (n < 0 || (sqlite3_uint64)n > (sqlite3_uint64)SIZE_MAX) {
+        sqlite3_free(data);
+        return SQLITE_NOMEM;
+    }
+    *size = (size_t)n;
+    *out_data = data;
+    return SQLITE_OK;
 }
 int sf_deserialize(sf_db *db, const char *schema, const void *data, size_t size,
                    size_t reserved, unsigned int flags) {

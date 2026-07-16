@@ -39,6 +39,61 @@ static int progress_callback(void *userdata) {
     ++progress_calls;
     return 0;
 }
+static int query_int(sf_db *db, const char *sql);
+
+static int authorizer_calls;
+static int update_calls;
+static int commit_calls;
+static int rollback_calls;
+static int trace_calls;
+static int busy_calls;
+static int authorizer_callback(void *userdata, int action, const char *a, const char *b, const char *db, const char *trigger) {
+    (void)userdata; (void)action; (void)a; (void)b; (void)db; (void)trigger; ++authorizer_calls; return SQLITE_OK;
+}
+static void update_callback(void *userdata, int op, const char *db, const char *table, sqlite3_int64 rowid) {
+    (void)userdata; (void)op; (void)db; (void)table; (void)rowid; ++update_calls;
+}
+static int commit_callback(void *userdata) { (void)userdata; ++commit_calls; return 0; }
+static void rollback_callback(void *userdata) { (void)userdata; ++rollback_calls; }
+static int trace_callback(void *userdata, unsigned event, void *data, void *aux) {
+    (void)userdata; (void)event; (void)data; (void)aux; ++trace_calls; return 0;
+}
+static int busy_callback(void *userdata, int attempts) { (void)userdata; (void)attempts; ++busy_calls; return 0; }
+
+static void test_token_and_hooks(sf_db *db) {
+    sf_callback_token *token = NULL;
+    int offset = 3;
+    assert(sf_register_scalar_function(db, "token_add", 1, SQLITE_UTF8, scalar_add, &offset, &token) == SQLITE_OK);
+    assert(token != NULL);
+    assert(query_int(db, "SELECT token_add(4)") == 7);
+    assert(sf_callback_token_close(token) == SQLITE_OK);
+    assert(sf_callback_token_close(token) == SQLITE_OK);
+    sf_stmt *stmt = NULL;
+    assert(sf_prepare(db, "SELECT token_add(4)", &stmt) != SQLITE_OK);
+    assert(stmt == NULL);
+
+    assert(sf_set_authorizer(db, authorizer_callback, NULL) == SQLITE_OK);
+    assert(sf_set_update_hook(db, update_callback, NULL) == SQLITE_OK);
+    assert(sf_set_commit_hook(db, commit_callback, NULL) == SQLITE_OK);
+    assert(sf_set_rollback_hook(db, rollback_callback, NULL) == SQLITE_OK);
+    assert(sf_set_trace(db, SQLITE_TRACE_STMT, trace_callback, NULL) == SQLITE_OK);
+    assert(sf_set_busy_handler(db, busy_callback, NULL) == SQLITE_OK);
+    assert(sf_exec(db, "CREATE TABLE hooks(value INTEGER)") == SQLITE_OK);
+    assert(sf_exec(db, "INSERT INTO hooks VALUES (1)") == SQLITE_OK);
+    assert(sf_exec(db, "INSERT INTO hooks VALUES (2)") == SQLITE_OK);
+    assert(authorizer_calls > 0);
+    assert(update_calls > 0);
+    assert(commit_calls > 0);
+    assert(trace_calls > 0);
+    assert(sf_clear_authorizer(db) == SQLITE_OK);
+    assert(sf_clear_update_hook(db) == SQLITE_OK);
+    assert(sf_clear_commit_hook(db) == SQLITE_OK);
+    assert(sf_clear_rollback_hook(db) == SQLITE_OK);
+    assert(sf_clear_trace(db) == SQLITE_OK);
+    assert(sf_clear_busy_handler(db) == SQLITE_OK);
+    assert(sf_set_authorizer(NULL, authorizer_callback, NULL) == SQLITE_MISUSE);
+    (void)rollback_calls; (void)busy_calls;
+}
 
 static int query_int(sf_db *db, const char *sql) {
     sf_stmt *stmt = NULL;
@@ -139,6 +194,7 @@ int main(void) {
     test_scalar_lifecycle(db);
     test_collation_lifecycle(db);
     test_progress_lifecycle(db);
+    test_token_and_hooks(db);
     assert(sf_close(db) == SQLITE_OK);
     puts("native callback tests passed");
     return 0;

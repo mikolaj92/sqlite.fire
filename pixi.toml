@@ -9,5 +9,5 @@ smoke = "make -C native && mojo run -I src examples/basic.mojo"
 test = "make -C native && mojo run -I src tests/test_sqlite.mojo"
 
 [dependencies]
-mojo = ">=1.0.0b2,<1.0.0b3"
+mojo = "==1.0.0b3.dev2026071505"
 sqlite = ">=3.51"

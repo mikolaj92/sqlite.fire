@@ -139,26 +139,24 @@ Pojedynczy test:
 uv run mojo run -I src tests/test_sqlite.mojo
 ```
 
-Pełna suite Mojo:
+Pełna suite Mojo oraz natywne testy strict:
 
 ```sh
-make -B -C native
-for f in tests/*.mojo; do
-  uv run mojo build -I src "$f" -o "/tmp/$(basename "$f" .mojo)" || exit 1
-  "/tmp/$(basename "$f" .mojo)" || exit 1
-done
+./scripts/test.sh
 ```
 
-Testy natywnego ABI:
+Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
+ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu. To jest ta sama
+ścieżka wykonywana w CI (`pixi run ./scripts/test.sh`).
+
+Ręczne testy natywnego ABI:
 
 ```sh
-cc -std=c11 -Wall -Wextra -Werror -I native \
-  tests/native_callbacks.c native/sqlite_fire.c -lsqlite3 -o /tmp/native_callbacks
-/tmp/native_callbacks
+make -C native strict-test
+```
 
-cc -std=c11 -Wall -Wextra -Werror -I native \
-  tests/native_vfs.c native/sqlite_fire.c -lsqlite3 -o /tmp/native_vfs
-/tmp/native_vfs
+Sanitizery są dostępne lokalnie przez `make -C native sanitize`; nie są częścią gwarantowanej
+walidacji, jeśli środowisko nie kończy ich w rozsądnym czasie.
 ```
 
 Suite obejmuje kontrakty inspirowane CPython `sqlite3`, rusqlite i go-sqlite3:

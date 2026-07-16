@@ -15,10 +15,17 @@ from .sqlite import Connection, SQLiteError
 comptime SQLITE_OK: Int32 = 0
 comptime SQLITE_ERROR: Int32 = 1
 comptime SQLITE_MISUSE: Int32 = 21
+comptime SQLITE_RANGE: Int32 = 25
 comptime SQLITE_NOMEM: Int32 = 7
 comptime SQLITE_OPEN_READWRITE: Int32 = 0x00000002
 comptime SQLITE_OPEN_CREATE: Int32 = 0x00000004
 comptime SQLITE_OPEN_URI: Int32 = 0x00000040
+comptime C_INT_MAX: Int = 2147483647
+
+def _checked_c_int(value: Int, message: String, code: Int = Int(SQLITE_RANGE)) raises SQLiteError -> c_int:
+    if value < 0 or value > C_INT_MAX:
+        raise _error(code, message)
+    return c_int(value)
 
 comptime DbPtr = MutUnsafePointer[UInt8, MutUntrackedOrigin]
 comptime DbOut = MutUnsafePointer[DbPtr, MutUntrackedOrigin]
@@ -45,6 +52,7 @@ comptime BackupRemainingFn = def(BlobPtr) thin abi("C") -> c_int
 comptime BackupPagecountFn = def(BlobPtr) thin abi("C") -> c_int
 comptime BackupFinishFn = def(BlobPtr) thin abi("C") -> c_int
 comptime SerializeFn = def(DbPtr, CStr, SizeOut, UInt32) thin abi("C") -> BlobPtr
+comptime SerializeStatusFn = def(DbPtr, CStr, SizeOut, UInt32, BlobOut) thin abi("C") -> c_int
 comptime DeserializeFn = def(DbPtr, CStr, BlobPtr, UInt, UInt, UInt32) thin abi("C") -> c_int
 comptime FreeFn = def(BlobPtr) thin abi("C")
 comptime EnableExtensionFn = def(DbPtr, c_int) thin abi("C") -> c_int
@@ -53,10 +61,10 @@ comptime VfsPtr = MutUnsafePointer[UInt8, MutUntrackedOrigin]
 comptime VfsOut = MutUnsafePointer[VfsPtr, MutUntrackedOrigin]
 comptime VfsRegisterFn = def(CStr, CStr, c_int, VfsOut) thin abi("C") -> c_int
 comptime VfsUnregisterFn = def(VfsPtr) thin abi("C") -> c_int
-
 comptime LIBRARY_PATH = (
     "native/libsqlite_fire.so" if CompilationTarget.is_linux()
-    else "native/libsqlite_fire.dylib"
+    else "native/libsqlite_fire.dylib" if CompilationTarget.is_macos()
+    else ""
 )
 
 def _cstring(mut value: String) raises SQLiteError -> CStringSlice[origin_of(value)]:
@@ -128,6 +136,7 @@ struct AdvancedDatabase(Movable):
     var _blob_open: BlobOpenFn
     var _backup_start: BackupStartFn
     var _serialize: SerializeFn
+    var _serialize_status: SerializeStatusFn
     var _deserialize: DeserializeFn
     var _free: FreeFn
     var _enable_extension: EnableExtensionFn
@@ -148,6 +157,7 @@ struct AdvancedDatabase(Movable):
             self._blob_open = self._library.get_function[BlobOpenFn]("sf_blob_open")
             self._backup_start = self._library.get_function[BackupStartFn]("sf_backup_start")
             self._serialize = self._library.get_function[SerializeFn]("sf_serialize")
+            self._serialize_status = self._library.get_function[SerializeStatusFn]("sf_serialize_status")
             self._deserialize = self._library.get_function[DeserializeFn]("sf_deserialize")
             self._free = self._library.get_function[FreeFn]("sf_free")
             self._enable_extension = self._library.get_function[EnableExtensionFn]("sf_enable_load_extension")
@@ -169,15 +179,11 @@ struct AdvancedDatabase(Movable):
     # Borrow the sf_db owned by a Connection. The Connection must remain open
     # for this view's entire lifetime; this view never closes that handle.
     def __init__(out self, connection: Connection) raises SQLiteError:
-        var db = connection._raw_db()
-        self._from_db(db)
-
-    # Internal constructor: sf_db ownership remains with the caller.
-    def _from_db(mut self, db: DbPtr) raises SQLiteError:
-        self._closed = False
+        self._closed = True
         self._owns_db = False
         self._extensions_enabled = False
-        self._db = db
+        self._db = DbPtr(unsafe_from_address=1)
+        var db = connection._raw_db()
         try:
             self._library = OwnedDLHandle(LIBRARY_PATH)
             self._close = self._library.get_function[CloseFn]("sf_close")
@@ -187,12 +193,20 @@ struct AdvancedDatabase(Movable):
             self._blob_open = self._library.get_function[BlobOpenFn]("sf_blob_open")
             self._backup_start = self._library.get_function[BackupStartFn]("sf_backup_start")
             self._serialize = self._library.get_function[SerializeFn]("sf_serialize")
+            self._serialize_status = self._library.get_function[SerializeStatusFn]("sf_serialize_status")
             self._deserialize = self._library.get_function[DeserializeFn]("sf_deserialize")
             self._free = self._library.get_function[FreeFn]("sf_free")
             self._enable_extension = self._library.get_function[EnableExtensionFn]("sf_enable_load_extension")
             self._load_extension = self._library.get_function[LoadExtensionFn]("sf_load_extension")
         except e:
             raise _error(Int(SQLITE_MISUSE), String(e))
+        self._db = db
+        self._closed = False
+
+    # Internal constructor: sf_db ownership remains with the caller.
+    def _from_db(mut self, db: DbPtr) raises SQLiteError:
+        self._db = db
+        self._closed = False
 
     def __del__(deinit self):
         if not self._closed and self._owns_db:
@@ -216,18 +230,19 @@ struct AdvancedDatabase(Movable):
     def _raw_db(self) raises SQLiteError -> DbPtr:
         self._ensure_open()
         return self._db
-
     def interrupt(self) raises SQLiteError:
         self._ensure_open()
         self._interrupt(self._db)
 
     def set_limit(mut self, category: Int, new_value: Int) raises SQLiteError -> Int:
         self._ensure_open()
-        return Int(self._limit(self._db, c_int(category), c_int(new_value)))
+        if new_value < 0 or new_value > C_INT_MAX:
+            raise _error(Int(SQLITE_RANGE), "sqlite.fire: limit value out of range")
+        return Int(self._limit(self._db, _checked_c_int(category, "sqlite.fire: invalid limit category"), _checked_c_int(new_value, "sqlite.fire: limit value out of range")))
 
     def limit(self, category: Int) raises SQLiteError -> Int:
         self._ensure_open()
-        return Int(self._limit(self._db, c_int(category), c_int(-1)))
+        return Int(self._limit(self._db, _checked_c_int(category, "sqlite.fire: invalid limit category"), c_int(-1)))
 
 
     def execute(self, sql: String) raises SQLiteError:
@@ -252,7 +267,7 @@ struct AdvancedDatabase(Movable):
         self._ensure_open()
         if flags < 0 or flags > 0:
             raise _error(Int(SQLITE_MISUSE), "sqlite.fire: SQLITE_SERIALIZE_NOCOPY is unsupported for copied results")
-        return _serialize_copy(self._db, schema, UInt32(flags), self._serialize, self._free)
+        return _serialize_copy(self._db, schema, UInt32(flags), self._serialize_status, self._free)
 
     def deserialize(mut self, schema: String, data: List[UInt8], reserved: Int = 0, flags: Int = 0) raises SQLiteError:
         self._ensure_open()
@@ -369,44 +384,46 @@ struct IncrementalBlob(Movable):
         while i < length:
             buffer.append(0)
             i += 1
-        var result_code = self._read(self._blob, BlobPtr(unsafe_from_address=Int(buffer.unsafe_ptr())), c_int(length), c_int(offset))
+        var result_code = self._read(self._blob, BlobPtr(unsafe_from_address=Int(buffer.unsafe_ptr())), _checked_c_int(length, "sqlite.fire: blob length out of range"), _checked_c_int(offset, "sqlite.fire: blob offset out of range"))
         _check(result_code, "sqlite.fire: failed to read incremental blob")
         i = 0
         while i < length:
             result.append(buffer[i])
             i += 1
         return result^
-
     def write(mut self, offset: Int, data: List[UInt8]) raises SQLiteError:
         self._ensure_open()
         if offset < 0: raise _error(Int(SQLITE_MISUSE), "sqlite.fire: invalid blob offset")
         var data_ptr = BlobPtr(unsafe_from_address=1)
         if len(data) != 0: data_ptr = BlobPtr(unsafe_from_address=Int(data.unsafe_ptr()))
-        _check(self._write(self._blob, data_ptr, c_int(len(data)), c_int(offset)), "sqlite.fire: failed to write incremental blob")
+        _check(self._write(self._blob, data_ptr, _checked_c_int(len(data), "sqlite.fire: blob length out of range"), _checked_c_int(offset, "sqlite.fire: blob offset out of range")), "sqlite.fire: failed to write incremental blob")
 
     def reopen(mut self, rowid: Int) raises SQLiteError:
         self._ensure_open()
         _check(self._reopen(self._blob, c_long_long(rowid)), "sqlite.fire: failed to reopen incremental blob")
 
-def _serialize_copy(db: DbPtr, schema: String, flags: UInt32, serialize: SerializeFn, free: FreeFn) raises SQLiteError -> List[UInt8]:
+def _serialize_copy(db: DbPtr, schema: String, flags: UInt32, serialize_status: SerializeStatusFn, free: FreeFn) raises SQLiteError -> List[UInt8]:
     if flags != 0:
         raise _error(Int(SQLITE_MISUSE), "sqlite.fire: SQLITE_SERIALIZE_NOCOPY is unsupported for copied results")
     var schema_value = schema
     var schema_c = _cstring(schema_value)
     var size_holder = alloc[UInt](1)
-    size_holder[] = 0
-    var pointer = serialize(db, CStr(unsafe_from_address=Int(schema_c.unsafe_ptr())), SizeOut(to=size_holder[]), flags)
-    var size = size_holder[]
-    var result = List[UInt8]()
-    if Int(pointer) == 0:
+    var pointer_holder = alloc[BlobPtr](1)
+    pointer_holder[] = BlobPtr(unsafe_from_address=1)
+    var result_code = serialize_status(db, CStr(unsafe_from_address=Int(schema_c.unsafe_ptr())), SizeOut(to=size_holder[]), flags, BlobOut(to=pointer_holder[]))
+    if result_code != SQLITE_OK:
+        pointer_holder.free()
         size_holder.free()
-        if size != 0: raise _error(Int(SQLITE_NOMEM), "sqlite.fire: serialization returned a null buffer")
-        return result^
+        raise _error(Int(result_code), "sqlite.fire: failed to serialize database")
+    var size = size_holder[]
+    var pointer = pointer_holder[]
+    var result = List[UInt8]()
     var i: UInt = 0
     while i < size:
         result.append((pointer + i).load())
         i += 1
-    free(pointer)
+    if Int(pointer) != 0: free(pointer)
+    pointer_holder.free()
     size_holder.free()
     return result^
 struct Backup(Movable):
@@ -458,7 +475,7 @@ struct Backup(Movable):
     def step(mut self, pages: Int = 1) raises SQLiteError -> Int:
         if self._finished: raise _error(Int(SQLITE_MISUSE), "sqlite.fire: backup is finished")
         if pages < 1: raise _error(Int(SQLITE_MISUSE), "sqlite.fire: backup pages must be positive")
-        return Int(self._step(self._backup, c_int(pages)))
+        return Int(self._step(self._backup, _checked_c_int(pages, "sqlite.fire: backup pages out of range")))
 
     def remaining(self) raises SQLiteError -> Int:
         if self._finished: raise _error(Int(SQLITE_MISUSE), "sqlite.fire: backup is finished")

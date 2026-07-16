@@ -4,9 +4,7 @@ __pycache__/
 .DS_Store
 native/libsqlite_fire.dylib
 native/libsqlite_fire.so
-advanced_probe
-advanced_runtime5
-test_sqlite
-test_*
-advanced_*
-native/libsqlite_fire.dylib
+/advanced_probe
+/advanced_runtime5
+/test_sqlite
+/test_*

@@ -25,6 +25,12 @@ comptime SQLITE_OPEN_CREATE: Int32 = 0x00000004
 comptime SQLITE_OPEN_URI: Int32 = 0x00000040
 comptime SQLITE_ROW: Int32 = 100
 comptime SQLITE_DONE: Int32 = 101
+comptime C_INT_MAX: Int = 2147483647
+
+def _checked_c_int(value: Int, message: String, code: Int = Int(SQLITE_RANGE)) raises SQLiteError -> c_int:
+    if value < 0 or value > C_INT_MAX:
+        raise SQLiteError(code=code, message=message)
+    return c_int(value)
 
 @fieldwise_init
 struct OpenOptions(Copyable, Writable):
@@ -137,7 +143,8 @@ comptime ColumnBytesFn = def(StmtPtr, c_int) thin abi("C") -> c_int
 
 comptime LIBRARY_PATH = (
     "native/libsqlite_fire.so" if CompilationTarget.is_linux()
-    else "native/libsqlite_fire.dylib"
+    else "native/libsqlite_fire.dylib" if CompilationTarget.is_macos()
+    else ""
 )
 
 def _cstring(mut value: String) raises SQLiteError -> CStringSlice[origin_of(value)]:
@@ -227,7 +234,12 @@ struct Connection(Movable):
             var filename_c = _cstring(filename)
             var vfs = options.vfs
             var vfs_c = _cstring(vfs)
-            var result = self._library.get_function[OpenOptionsFn]("sf_open_options")(CStr(unsafe_from_address=Int(filename_c.unsafe_ptr())), c_int(options.flags), CStr(unsafe_from_address=Int(vfs_c.unsafe_ptr())), DbOut(to=holder[]))
+            var result = self._library.get_function[OpenOptionsFn]("sf_open_options")(
+                CStr(unsafe_from_address=Int(filename_c.unsafe_ptr())),
+                _checked_c_int(options.flags, "sqlite.fire: open flags out of range", Int(SQLITE_MISUSE)),
+                CStr(unsafe_from_address=Int(vfs_c.unsafe_ptr())),
+                DbOut(to=holder[])
+            )
             open_result = Int32(result)
             if result == SQLITE_OK:
                 self._db = holder[]
@@ -285,7 +297,7 @@ struct Connection(Movable):
 
     def busy_timeout(mut self, milliseconds: Int) raises SQLiteError:
         self._ensure_open()
-        var result = self._busy_timeout(self._db, c_int(milliseconds))
+        var result = self._busy_timeout(self._db, _checked_c_int(milliseconds, "sqlite.fire: busy timeout out of range", Int(SQLITE_RANGE)))
         if result != SQLITE_OK:
             raise SQLiteError(code=Int(result), message="sqlite.fire: failed to set busy timeout")
 
@@ -299,7 +311,10 @@ struct Connection(Movable):
 
     def limit(mut self, category: Int, new_value: Int) raises SQLiteError -> Int:
         self._ensure_open()
-        var result = self._limit(self._db, c_int(category), c_int(new_value))
+        var category_c = _checked_c_int(category, "sqlite.fire: invalid limit category")
+        if new_value < -1 or new_value > C_INT_MAX:
+            raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: limit value out of range")
+        var result = self._limit(self._db, category_c, c_int(new_value))
         if result < 0:
             raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: invalid limit category")
         return Int(result)
@@ -469,7 +484,7 @@ struct Statement(Movable):
 
     def bind_null(mut self, index: Int) raises SQLiteError:
         self._ensure_open()
-        var result = self._bind_null(self._stmt, c_int(index))
+        var result = self._bind_null(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"))
         if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind null")
     def bind_value(mut self, index: Int, value: SQLiteValue) raises SQLiteError:
         """Bind an owned scalar using SQLite's native type semantics."""
@@ -501,26 +516,26 @@ struct Statement(Movable):
 
     def bind_int(mut self, index: Int, value: Int) raises SQLiteError:
         self._ensure_open()
-        var result = self._bind_int(self._stmt, c_int(index), c_long_long(value))
+        var result = self._bind_int(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"), c_long_long(value))
         if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind integer")
 
     def bind_real(mut self, index: Int, value: Float64) raises SQLiteError:
         self._ensure_open()
-        var result = self._bind_real(self._stmt, c_int(index), c_double(value))
+        var result = self._bind_real(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"), c_double(value))
         if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind real")
 
     def bind_text(mut self, index: Int, value: String) raises SQLiteError:
         self._ensure_open()
         var text_value = value
         var text_ptr = text_value.as_bytes().unsafe_ptr()
-        var result = self._bind_text(self._stmt, c_int(index), CStr(unsafe_from_address=Int(text_ptr)), c_int(text_value.byte_length()))
+        var result = self._bind_text(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"), CStr(unsafe_from_address=Int(text_ptr)), _checked_c_int(text_value.byte_length(), "sqlite.fire: text length out of range"))
         if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind text")
 
     def bind_blob(mut self, index: Int, value: List[UInt8]) raises SQLiteError:
         self._ensure_open()
         var length = len(value)
         var pointer = value.unsafe_ptr()
-        var result = self._bind_blob(self._stmt, c_int(index), BlobPtr(unsafe_from_address=Int(pointer)), c_int(length))
+        var result = self._bind_blob(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"), BlobPtr(unsafe_from_address=Int(pointer)), _checked_c_int(length, "sqlite.fire: blob length out of range"))
         if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind blob")
 
     def parameter_count(self) raises SQLiteError -> Int:
@@ -531,7 +546,7 @@ struct Statement(Movable):
         self._ensure_open()
         if index < 1 or index > self.parameter_count():
             raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: parameter index out of range")
-        var name = self._parameter_name(self._stmt, c_int(index))
+        var name = self._parameter_name(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"))
         if Int(name) == 0: return ""
         return _string_from_cstr(name)
 
@@ -559,7 +574,7 @@ struct Statement(Movable):
 
     def _metadata(self, index: Int, getter: ColumnMetadataFn) raises SQLiteError -> String:
         self._check_column(index)
-        var result = getter(self._stmt, c_int(index))
+        var result = getter(self._stmt, _checked_c_int(index, "sqlite.fire: column index out of range"))
         if Int(result) == 0: return ""
         return _string_from_cstr(result)
 
@@ -605,35 +620,37 @@ struct Statement(Movable):
 
     def column_name(self, index: Int) raises SQLiteError -> String:
         self._check_column(index)
-        return _string_from_cstr(self._column_name(self._stmt, c_int(index)))
+        return _string_from_cstr(self._column_name(self._stmt, _checked_c_int(index, "sqlite.fire: column index out of range")))
 
     def column_null(self, index: Int) raises SQLiteError -> Bool:
         return self.column_type(index) == Int(SQLITE_NULL)
 
     def column_type(self, index: Int) raises SQLiteError -> Int:
         self._check_column(index)
-        return Int(self._column_type(self._stmt, c_int(index)))
+        return Int(self._column_type(self._stmt, _checked_c_int(index, "sqlite.fire: column index out of range")))
 
     def column_int(self, index: Int) raises SQLiteError -> Int:
         self._check_column(index)
-        return Int(self._column_int(self._stmt, c_int(index)))
+        return Int(self._column_int(self._stmt, _checked_c_int(index, "sqlite.fire: column index out of range")))
 
     def column_real(self, index: Int) raises SQLiteError -> Float64:
         self._check_column(index)
-        return Float64(self._column_double(self._stmt, c_int(index)))
+        return Float64(self._column_double(self._stmt, _checked_c_int(index, "sqlite.fire: column index out of range")))
 
     def column_text(self, index: Int) raises SQLiteError -> String:
         self._check_column(index)
         if self.column_null(index): return ""
-        return _string_from_cstr(self._column_text(self._stmt, c_int(index)))
+        return _string_from_cstr(self._column_text(self._stmt, _checked_c_int(index, "sqlite.fire: column index out of range")))
 
     def column_blob(self, index: Int) raises SQLiteError -> List[UInt8]:
         self._check_column(index)
         var result = List[UInt8]()
         if self.column_null(index): return result^
-        var length = Int(self._column_bytes(self._stmt, c_int(index)))
+        var index_c = _checked_c_int(index, "sqlite.fire: column index out of range")
+        var length = Int(self._column_bytes(self._stmt, index_c))
+        if length < 0: raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: invalid blob length")
         if length == 0: return result^
-        var pointer = self._column_blob(self._stmt, c_int(index))
+        var pointer = self._column_blob(self._stmt, index_c)
         if Int(pointer) == 0: raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: null blob pointer")
         var i = 0
         while i < length:
