@@ -123,6 +123,13 @@ struct Row(Movable):
         if index < 0 or index >= self.count():
             raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: row column index out of range")
         return self._names[index]
+    def index(self, name: String) raises SQLiteError -> Int:
+        var i = 0
+        while i < self.count():
+            if self._names[i] == name:
+                return i
+            i += 1
+        raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: row column name not found")
     def value(self, index: Int) raises SQLiteError -> SQLiteValue:
         if index < 0 or index >= self.count():
             raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: row column index out of range")
@@ -167,11 +174,26 @@ struct Row(Movable):
             raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not INTEGER")
         return item.integer_value
 
+    def real_by_name(self, name: String) raises SQLiteError -> Float64:
+        var item = self.value_by_name(name)
+        if item.kind != Int(SQLITE_REAL):
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not REAL")
+        return item.real_value
+
     def text_by_name(self, name: String) raises SQLiteError -> String:
         var item = self.value_by_name(name)
         if item.kind != Int(SQLITE_TEXT):
             raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not TEXT")
         return item.text_value
+
+    def blob_by_name(self, name: String) raises SQLiteError -> List[UInt8]:
+        var item = self.value_by_name(name)
+        if item.kind != Int(SQLITE_BLOB):
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not BLOB")
+        return item.blob_value.copy()
+
+    def is_null_by_name(self, name: String) raises SQLiteError -> Bool:
+        return self.value_by_name(name).is_null()
 
 struct Savepoint(Movable):
     """A validated savepoint token managed by a ``Connection``."""

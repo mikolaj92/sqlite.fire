@@ -70,6 +70,10 @@ def main() raises:
     assert typed.is_null(4)
     assert typed.integer_by_name("number") == 7
     assert typed.text_by_name("label") == "ok"
+    assert typed.index("label") == 2
+    assert typed.real_by_name("ratio") == 3.5
+    assert typed.blob_by_name("payload")[1] == 2
+    assert typed.is_null_by_name("absent")
     var wrong_type = False
     try:
         _ = typed.text(0)

@@ -53,10 +53,12 @@ automatycznie.
 - `SQLiteError` z kodem SQLite i komunikatem;
 - `OpenOptions` dla `sqlite3_open_v2` oraz wyboru VFS;
 - `SQLiteValue` dla SQL `NULL`, INTEGER, REAL, TEXT i BLOB;
-- `Row` jako posiadana kopia bieżącego wiersza z dostępem po indeksie i nazwie;
+- `Row` jako posiadana kopia bieżącego wiersza z dostępem po indeksie, nazwie i
+  wyszukiwaniem przez `index()`;
 - `Row` oferuje też typowane gettery `integer()`, `real()`, `text()`, `blob()` i
-  `is_null()` oraz warianty nazwane `integer_by_name()`/`text_by_name()`; niezgodny
-  typ zgłasza `SQLITE_MISUSE` zamiast cichej konwersji;
+  `is_null()` oraz warianty nazwane `integer_by_name()`, `real_by_name()`,
+  `text_by_name()`, `blob_by_name()` i `is_null_by_name()`; niezgodny typ zgłasza
+  `SQLITE_MISUSE` zamiast cichej konwersji;
 - prepared statements, bindingi pozycyjne i nazwane, `bind_value()`/`column_value()`,
   `reset()` oraz `clear_bindings()`;
 - walidowane `Savepoint` z `savepoint()`, `rollback_to()` i `release()`;
