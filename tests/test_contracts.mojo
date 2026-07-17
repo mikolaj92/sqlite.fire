@@ -57,6 +57,26 @@ def main() raises:
     assert missing_name
     row_stmt.close()
     assert snapshot.value(1).integer_value == 1
+    var typed_stmt = db.query("SELECT 7 AS number, 3.5 AS ratio, 'ok' AS label, x'0102' AS payload, NULL AS absent\0")
+    assert typed_stmt.step()
+    var typed = typed_stmt.row()
+    assert typed.integer(0) == 7
+    assert typed.real(1) == 3.5
+    assert typed.text(2) == "ok"
+    var payload = typed.blob(3)
+    assert len(payload) == 2
+    assert payload[0] == 1
+    assert payload[1] == 2
+    assert typed.is_null(4)
+    assert typed.integer_by_name("number") == 7
+    assert typed.text_by_name("label") == "ok"
+    var wrong_type = False
+    try:
+        _ = typed.text(0)
+    except:
+        wrong_type = True
+    assert wrong_type
+    typed_stmt.close()
 
     var point = db.savepoint("nested_point")
     var point_insert = db.query("INSERT INTO t(v) VALUES (?)\0")

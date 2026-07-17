@@ -134,6 +134,44 @@ struct Row(Movable):
                 return self.value(i)
             i += 1
         raise SQLiteError(code=Int(SQLITE_RANGE), message="sqlite.fire: row column name not found")
+    def is_null(self, index: Int) raises SQLiteError -> Bool:
+        return self.value(index).is_null()
+
+    def integer(self, index: Int) raises SQLiteError -> Int:
+        var item = self.value(index)
+        if item.kind != Int(SQLITE_INTEGER):
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not INTEGER")
+        return item.integer_value
+
+    def real(self, index: Int) raises SQLiteError -> Float64:
+        var item = self.value(index)
+        if item.kind != Int(SQLITE_REAL):
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not REAL")
+        return item.real_value
+
+    def text(self, index: Int) raises SQLiteError -> String:
+        var item = self.value(index)
+        if item.kind != Int(SQLITE_TEXT):
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not TEXT")
+        return item.text_value
+
+    def blob(self, index: Int) raises SQLiteError -> List[UInt8]:
+        var item = self.value(index)
+        if item.kind != Int(SQLITE_BLOB):
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not BLOB")
+        return item.blob_value.copy()
+
+    def integer_by_name(self, name: String) raises SQLiteError -> Int:
+        var item = self.value_by_name(name)
+        if item.kind != Int(SQLITE_INTEGER):
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not INTEGER")
+        return item.integer_value
+
+    def text_by_name(self, name: String) raises SQLiteError -> String:
+        var item = self.value_by_name(name)
+        if item.kind != Int(SQLITE_TEXT):
+            raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not TEXT")
+        return item.text_value
 
 struct Savepoint(Movable):
     """A validated savepoint token managed by a ``Connection``."""
