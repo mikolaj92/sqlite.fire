@@ -9,6 +9,9 @@ authors = [
 ]
 dependencies = []
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
 [dependency-groups]
 dev = [
     "mojo>=1.0.0b3.dev2026071505",

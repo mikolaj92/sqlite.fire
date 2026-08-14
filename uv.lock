@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 
 [[package]]
@@ -167,6 +167,11 @@ name = "sqlite-fire"
 version = "0.1.0"
 source = { virtual = "." }
 
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "mojo" },
@@ -174,6 +179,8 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" }]
+provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
