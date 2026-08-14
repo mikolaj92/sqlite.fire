@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_ERROR, SQLITE_INTEGER
+from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_ERROR, SQLITE_INTEGER, error_code
 
 def main() raises:
     var db = Connection(":memory:")
@@ -58,7 +58,7 @@ def main() raises:
     try:
         aborted.close()
     except e:
-        assert e.code == Int(SQLITE_CONSTRAINT)
+        assert error_code(e) == Int(SQLITE_CONSTRAINT)
 
     var after_abort = db.query("SELECT count(*), item_value FROM conflicts WHERE key = ?")
     after_abort.bind_text(1, "stable")
@@ -78,7 +78,7 @@ def main() raises:
     try:
         failed.close()
     except e:
-        assert e.code == Int(SQLITE_CONSTRAINT)
+        assert error_code(e) == Int(SQLITE_CONSTRAINT)
 
     var after_fail = db.query("SELECT count(*) FROM conflicts")
     assert after_fail.step()
@@ -110,7 +110,7 @@ def main() raises:
     try:
         rolled_back.close()
     except e:
-        assert e.code == Int(SQLITE_CONSTRAINT)
+        assert error_code(e) == Int(SQLITE_CONSTRAINT)
     assert not db.in_transaction()
 
     var after_rollback = db.query("SELECT count(*) FROM conflicts")
@@ -139,7 +139,7 @@ def main() raises:
         db.rollback()
     except e:
         second_rollback = True
-        assert e.code == Int(SQLITE_ERROR)
+        assert error_code(e) == Int(SQLITE_ERROR)
     assert second_rollback
     assert not db.in_transaction()
 

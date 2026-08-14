@@ -1,5 +1,5 @@
 from sqlite_fire import Connection, OpenOptions
-from sqlite_fire.sqlite import SQLITE_MISUSE, SQLITE_READONLY, SQLITE_RANGE
+from sqlite_fire.sqlite import SQLITE_MISUSE, SQLITE_READONLY, SQLITE_RANGE, error_code
 
 
 def main() raises:
@@ -45,6 +45,6 @@ def main() raises:
         assert False
     except e:
         range_failed = True
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     assert range_failed
     db.close()

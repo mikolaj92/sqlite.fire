@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLiteValue, SQLITE_CONSTRAINT, SQLITE_MISUSE, SQLITE_NOTFOUND, SQLITE_RANGE, SQLITE_ROW, SQLITE_DONE
+from sqlite_fire.sqlite import Connection, SQLiteValue, SQLITE_CONSTRAINT, SQLITE_MISUSE, SQLITE_NOTFOUND, SQLITE_RANGE, SQLITE_ROW, SQLITE_DONE, error_code
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -37,7 +37,7 @@ def main() raises:
         _ = db.fetch_one("SELECT v FROM t WHERE id = 99\0")
     except e:
         no_row = True
-        assert e.code == Int(SQLITE_NOTFOUND)
+        assert error_code(e) == Int(SQLITE_NOTFOUND)
     assert no_row
     # Owned row snapshots and validated savepoint lifecycle.
     var row_stmt = db.query("SELECT id, v FROM t ORDER BY id\0")
@@ -126,7 +126,7 @@ def main() raises:
         bad_param.bind_int(0, 42)
     except e:
         param_range = True
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     assert param_range
     bad_param.close()
 
@@ -137,7 +137,7 @@ def main() raises:
         _ = bad_col.column_int(1)
     except e:
         col_range = True
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     assert col_range
     bad_col.close()
 
@@ -148,7 +148,7 @@ def main() raises:
         dup.close()
         assert False
     except e:
-        assert e.code == Int(SQLITE_CONSTRAINT)
+        assert error_code(e) == Int(SQLITE_CONSTRAINT)
 
     # idempotent close and misuse after close
     var stmt = db.query("SELECT 1\0")
@@ -159,7 +159,7 @@ def main() raises:
         _ = stmt.step()
     except e:
         misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert misuse
     stmt.close()
 

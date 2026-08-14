@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_INTEGER, SQLITE_NULL, SQLITE_RANGE, SQLITE_ROW, SQLITE_DONE
+from sqlite_fire.sqlite import Connection, SQLITE_INTEGER, SQLITE_NULL, SQLITE_RANGE, SQLITE_ROW, SQLITE_DONE, error_code
 
 def main() raises:
     var db = Connection(":memory:")
@@ -70,7 +70,7 @@ def main() raises:
         bad_parameter.bind_int(0, 9)
     except e:
         parameter_failed = True
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     assert parameter_failed
     bad_parameter.close()
 
@@ -80,7 +80,7 @@ def main() raises:
         _ = bad_column.column_name(1)
     except e:
         column_failed = True
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     assert column_failed
     bad_column.close()
 

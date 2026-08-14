@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT
+from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, error_code
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -29,7 +29,7 @@ def main() raises:
         invalid_child.close()
     except e:
         invalid_close_constraint = True
-        assert e.code == Int(SQLITE_CONSTRAINT)
+        assert error_code(e) == Int(SQLITE_CONSTRAINT)
     assert invalid_close_constraint
 
     # A child referencing the existing parent succeeds.

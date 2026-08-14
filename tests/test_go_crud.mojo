@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_INTEGER
+from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_INTEGER, error_code
 
 def main() raises:
     var db = Connection(":memory:")
@@ -82,7 +82,7 @@ def main() raises:
         failed.close()
         assert False
     except e:
-        assert e.code == Int(SQLITE_CONSTRAINT)
+        assert error_code(e) == Int(SQLITE_CONSTRAINT)
 
     var final_row = db.query("SELECT count(*), qty FROM items WHERE key = ?")
     final_row.bind_text(1, "alpha")

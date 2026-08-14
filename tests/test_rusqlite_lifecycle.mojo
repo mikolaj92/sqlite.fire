@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_INTEGER, SQLITE_MISUSE, SQLITE_NULL
+from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_INTEGER, SQLITE_MISUSE, SQLITE_NULL, error_code
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -58,7 +58,7 @@ def main() raises:
         duplicate.close()
         assert False
     except e:
-        assert e.code == Int(SQLITE_CONSTRAINT)
+        assert error_code(e) == Int(SQLITE_CONSTRAINT)
 
     # Statement close is idempotent and all use-after-close calls are typed misuse.
     var closed = db.query("SELECT 1\0")
@@ -68,17 +68,17 @@ def main() raises:
         _ = closed.step()
         assert False
     except e:
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     try:
         closed.reset()
         assert False
     except e:
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     try:
         closed.bind_int(1, 1)
         assert False
     except e:
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
 
     # close_v2 lets an active statement finish before its handle is finalized.
     var active = db.query("SELECT value FROM items\0")
