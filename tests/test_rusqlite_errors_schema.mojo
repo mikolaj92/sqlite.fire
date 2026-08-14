@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_ERROR
+from sqlite_fire.sqlite import Connection, SQLITE_ERROR, error_code
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -10,7 +10,7 @@ def main() raises:
         assert False
     except e:
         malformed = True
-        assert e.code == Int(SQLITE_ERROR)
+        assert error_code(e) == Int(SQLITE_ERROR)
     assert malformed
     assert db.error_code() == Int(SQLITE_ERROR)
     assert db.extended_error_code() == Int(SQLITE_ERROR)

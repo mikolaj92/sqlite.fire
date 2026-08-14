@@ -28,6 +28,6 @@ esac
 for test in tests/*.mojo; do
     name=$(basename "$test" .mojo)
     output="$TMPDIR/$name"
-    uv run mojo build -I src "$test" -o "$output"
+    mojo build -I src "$test" -o "$output"
     "$output"
 done

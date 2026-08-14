@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_CANTOPEN, SQLITE_ERROR, SQLITE_INTEGER, SQLITE_MISUSE
+from sqlite_fire.sqlite import Connection, SQLITE_CANTOPEN, SQLITE_ERROR, SQLITE_INTEGER, SQLITE_MISUSE, error_code
 
 def main() raises:
     # CPython sqlite3 treats commit()/rollback() as harmless in autocommit mode.
@@ -17,7 +17,7 @@ def main() raises:
         inaccessible.close()
     except e:
         cant_open = True
-        assert e.code == Int(SQLITE_CANTOPEN)
+        assert error_code(e) == Int(SQLITE_CANTOPEN)
     assert cant_open
 
     # Every connection operation reports typed misuse after close.
@@ -27,7 +27,7 @@ def main() raises:
         db.execute("SELECT 1")
     except e:
         execute_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert execute_misuse
 
     var query_misuse = False
@@ -36,7 +36,7 @@ def main() raises:
         after_close_query.close()
     except e:
         query_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert query_misuse
 
     var begin_misuse = False
@@ -44,7 +44,7 @@ def main() raises:
         db.begin()
     except e:
         begin_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert begin_misuse
 
     var commit_misuse = False
@@ -52,7 +52,7 @@ def main() raises:
         db.commit()
     except e:
         commit_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert commit_misuse
 
     var rollback_misuse = False
@@ -60,7 +60,7 @@ def main() raises:
         db.rollback()
     except e:
         rollback_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert rollback_misuse
 
     var changes_misuse = False
@@ -68,7 +68,7 @@ def main() raises:
         _ = db.changes()
     except e:
         changes_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert changes_misuse
 
     var rowid_misuse = False
@@ -76,7 +76,7 @@ def main() raises:
         _ = db.last_insert_rowid()
     except e:
         rowid_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert rowid_misuse
 
     var error_code_misuse = False
@@ -84,7 +84,7 @@ def main() raises:
         _ = db.error_code()
     except e:
         error_code_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert error_code_misuse
 
     var extended_error_code_misuse = False
@@ -92,7 +92,7 @@ def main() raises:
         _ = db.extended_error_code()
     except e:
         extended_error_code_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert extended_error_code_misuse
 
     var busy_timeout_misuse = False
@@ -100,7 +100,7 @@ def main() raises:
         db.busy_timeout(1)
     except e:
         busy_timeout_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert busy_timeout_misuse
 
     # Prepared INSERT transitions transaction state and updates rowid/changes.
@@ -145,7 +145,7 @@ def main() raises:
         bad_query.close()
     except e:
         malformed = True
-        assert e.code == Int(SQLITE_ERROR)
+        assert error_code(e) == Int(SQLITE_ERROR)
     assert malformed
 
     # Numbered parameters bind by index even when referenced out of order.

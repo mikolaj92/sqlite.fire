@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_ERROR
+from sqlite_fire.sqlite import Connection, SQLITE_ERROR, error_code
 
 def main() raises:
     # A savepoint can roll back only its nested writes, then release and commit
@@ -56,7 +56,7 @@ def main() raises:
         assert False
     except e:
         second_begin_failed = True
-        assert e.code == Int(SQLITE_ERROR)
+        assert error_code(e) == Int(SQLITE_ERROR)
     assert second_begin_failed
     assert recovered_db.in_transaction()
     recovered_db.rollback()

@@ -1,6 +1,6 @@
 from std.collections import List
 from sqlite_fire import AdvancedDatabase, Connection, SQLiteValue
-from sqlite_fire.sqlite import SQLITE_BLOB, SQLITE_DONE, SQLITE_MISUSE, SQLITE_NULL, SQLITE_REAL, SQLITE_TEXT
+from sqlite_fire.sqlite import SQLITE_BLOB, SQLITE_DONE, SQLITE_MISUSE, SQLITE_NULL, SQLITE_REAL, SQLITE_TEXT, error_code
 
 
 def main() raises:
@@ -121,7 +121,7 @@ def main() raises:
         assert False
     except e:
         nocopy_rejected = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert nocopy_rejected
     serialization_db.close()
 

@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_READONLY
+from sqlite_fire.sqlite import Connection, SQLITE_READONLY, error_code
 
 def main() raises:
     var path = "file:/tmp/sqlite_fire_uri.db?mode=rwc\0"
@@ -19,7 +19,7 @@ def main() raises:
         read_only.execute("INSERT INTO uri_values(value) VALUES ('blocked')\0")
         assert False
     except e:
-        assert e.code == Int(SQLITE_READONLY)
+        assert error_code(e) == Int(SQLITE_READONLY)
     read_only.close()
 
     var cleanup = Connection(path)

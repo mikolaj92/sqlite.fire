@@ -1,6 +1,6 @@
 from std.collections import List
 from sqlite_fire import AdvancedDatabase, Backup, Connection, IncrementalBlob, Statement
-from sqlite_fire.sqlite import SQLITE_DONE, SQLITE_MISUSE
+from sqlite_fire.sqlite import SQLITE_DONE, SQLITE_MISUSE, error_code
 
 
 def orphan_statement() raises -> Statement:
@@ -58,7 +58,7 @@ def main() raises:
         assert False
     except e:
         statement_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert statement_misuse
 
     # Blob reads remain observable after an explicit owner close; close is safe twice.
@@ -85,7 +85,7 @@ def main() raises:
         assert False
     except e:
         blob_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert blob_misuse
 
     # A blob can also outlive its owner scope and remains deterministically closeable.
@@ -120,5 +120,5 @@ def main() raises:
         assert False
     except e:
         finished_misuse = True
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     assert finished_misuse

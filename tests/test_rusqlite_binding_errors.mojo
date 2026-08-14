@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_INTEGER, SQLITE_MISUSE, SQLITE_NULL, SQLITE_RANGE
+from sqlite_fire.sqlite import Connection, SQLITE_INTEGER, SQLITE_MISUSE, SQLITE_NULL, SQLITE_RANGE, error_code
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -16,22 +16,22 @@ def main() raises:
         _ = named.parameter_name(0)
         assert False
     except e:
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     try:
         _ = named.parameter_name(5)
         assert False
     except e:
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     try:
         named.bind_int(0, 1)
         assert False
     except e:
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     try:
         named.bind_int(5, 1)
         assert False
     except e:
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     named.close()
 
     # Repeated names share one slot; an unbound positional slot remains NULL.
@@ -54,27 +54,27 @@ def main() raises:
         closed.bind_null(1)
         assert False
     except e:
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     try:
         _ = closed.parameter_count()
         assert False
     except e:
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     try:
         _ = closed.parameter_name(1)
         assert False
     except e:
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     try:
         _ = closed.step_code()
         assert False
     except e:
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     try:
         closed.clear_bindings()
         assert False
     except e:
-        assert e.code == Int(SQLITE_MISUSE)
+        assert error_code(e) == Int(SQLITE_MISUSE)
     closed.close()
 
     # A statement without placeholders has count zero and rejects index one.
@@ -84,7 +84,7 @@ def main() raises:
         no_params.bind_text(1, "unexpected")
         assert False
     except e:
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     assert no_params.step()
     assert no_params.column_int(0) == 123
     no_params.close()
@@ -95,11 +95,11 @@ def main() raises:
         _ = columns.column_int(-1)
         assert False
     except e:
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     try:
         _ = columns.column_text(1)
         assert False
     except e:
-        assert e.code == Int(SQLITE_RANGE)
+        assert error_code(e) == Int(SQLITE_RANGE)
     columns.close()
     db.close()

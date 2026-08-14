@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_ERROR, SQLITE_INTEGER
+from sqlite_fire.sqlite import Connection, SQLITE_ERROR, SQLITE_INTEGER, error_code
 
 def main() raises:
     var db = Connection(":memory:")
@@ -56,7 +56,7 @@ def main() raises:
         missing.close()
     except e:
         ddl_was_rolled_back = True
-        assert e.code == Int(SQLITE_ERROR)
+        assert error_code(e) == Int(SQLITE_ERROR)
     assert ddl_was_rolled_back
 
     # BEGIN IMMEDIATE and BEGIN EXCLUSIVE expose the same autocommit transition.
@@ -86,7 +86,7 @@ def main() raises:
         db.execute("INSRT INTO ledger(note) VALUES ('bad')")
     except e:
         malformed = True
-        assert e.code == Int(SQLITE_ERROR)
+        assert error_code(e) == Int(SQLITE_ERROR)
     assert malformed
 
     # sqlite3_exec accepts a trailing SQL comment.

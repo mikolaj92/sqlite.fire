@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_BUSY, SQLITE_READONLY
+from sqlite_fire.sqlite import Connection, SQLITE_BUSY, SQLITE_READONLY, error_code
 
 def main() raises:
     var path = "file:/tmp/sqlite_fire_go_uri_locking.db?mode=rwc\0"
@@ -24,7 +24,7 @@ def main() raises:
         read_only.execute("INSERT INTO go_uri_locking(value) VALUES ('ro-write')\0")
         assert False
     except e:
-        assert e.code == Int(SQLITE_READONLY)
+        assert error_code(e) == Int(SQLITE_READONLY)
     read_only.close()
 
     var read_write = Connection("file:/tmp/sqlite_fire_go_uri_locking.db?mode=rw\0")
@@ -43,7 +43,7 @@ def main() raises:
         contender.execute("INSERT INTO go_uri_locking(value) VALUES ('blocked')\0")
         assert False
     except e:
-        assert e.code == Int(SQLITE_BUSY)
+        assert error_code(e) == Int(SQLITE_BUSY)
     read_write.rollback()
     contender.execute("INSERT INTO go_uri_locking(value) VALUES ('after-lock')\0")
     contender.close()
