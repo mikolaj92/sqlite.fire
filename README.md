@@ -2,8 +2,8 @@
 
 Bezpośredni dostęp do systemowego SQLite z Mojo przez mały most C ABI.
 
-Projekt wspiera macOS i Linux, korzysta z systemowego `libsqlite3` i używa `uv` do
-środowiska deweloperskiego oraz toolchainu Mojo.
+Projekt wspiera macOS i Linux, korzysta z systemowego `libsqlite3`. Toolchain
+Mojo jest **pixi** (`mojo == 1.0.0`). `uv` jest tylko dla testów Pythona (`pytest`).
 
 ## Status
 
@@ -14,29 +14,21 @@ ani fałszywymi callbackami Mojo.
 
 ## Wymagania i instalacja
 
-- `uv`
-- albo `pixi` (zalecane do powtarzalnego środowiska CI)
-- nightly Mojo `1.0.0b3.dev2026071505`
+- `pixi` (toolchain Mojo **1.0.0**, kanał `https://conda.modular.com/max`)
+- `uv` (opcjonalnie, tylko `pytest`)
 - systemowa biblioteka SQLite (`libsqlite3`)
 - macOS albo Linux
 
-`uv`:
-
-```sh
-uv sync --dev --prerelease allow
-```
-
-`pixi`:
-
 ```sh
 pixi install
+pixi run ./scripts/test.sh
 ```
 
-Bibliotekę natywną buduje runner testów. Do ręcznego uruchomienia przykładu użyj:
+Bibliotekę natywną buduje runner testów. Przykład:
 
 ```sh
 make -C native
-uv run mojo run -I src examples/basic.mojo
+pixi run mojo run -I src examples/basic.mojo
 ```
 
 Na macOS powstaje `native/libsqlite_fire.dylib`, a na Linuxie
@@ -145,7 +137,7 @@ Legenda: `[x]` dostępne i opisane; `[ ]` brakujące, wyłączone albo ograniczo
 - [x] Podstawowe API Mojo, rozszerzone API oraz passthrough VFS są dostępne na macOS i Linux.
 - [x] Natywny C ABI udostępnia także bezpośrednią serializację z flagami (w tym `NOCOPY`)
   oraz ładowanie rozszerzeń; te funkcje nie są równoważne z bezpiecznym wrapperem Mojo.
-- [ ] **Callbacki Mojo → C.** Zweryfikowane z `Mojo 1.0.0b3.dev2026071505` (`236eccec`):
+- [ ] **Callbacki Mojo → C.** Zweryfikowane z Mojo **1.0.0**:
   `def(... ) thin abi("C")` działa jako typ funkcji importowanej z biblioteki, ale
   przekazanie funkcji Mojo do tego typu nie działa bezpiecznie. Wariant bez `thin`
   odrzuca konwersję podczas kompilacji, `escaping` jest odrzucone przez parser, a
@@ -179,7 +171,7 @@ jest zalecane; zachowanie po `sqlite3_close_v2` opisano wyżej jako obserwację,
 
 ```sh
 make -C native
-uv run mojo run -I src examples/basic.mojo
+pixi run mojo run -I src examples/basic.mojo
 ```
 
 Przykład jawnie zamyka statementy i połączenie.
@@ -189,7 +181,7 @@ Przykład jawnie zamyka statementy i połączenie.
 Pojedynczy test Mojo:
 
 ```sh
-uv run mojo run -I src tests/test_sqlite.mojo
+pixi run mojo run -I src tests/test_sqlite.mojo
 ```
 
 Równoważne zadania `pixi` (`smoke` i `test`) uruchamiają przykład albo pojedynczy test.
