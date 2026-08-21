@@ -14,17 +14,11 @@ dev = ["pytest>=8.0"]
 
 [dependency-groups]
 dev = [
-    "mojo>=1.0.0b3.dev2026071505",
     "pytest>=8.0",
 ]
 
 [tool.uv]
 package = false
-
-[[tool.uv.index]]
-name = "modular-nightly"
-url = "https://whl.modular.com/nightly/simple/"
-
 
 [build-system]
 requires = ["hatchling"]
