@@ -157,7 +157,7 @@ Legenda: `[x]` dostępne i opisane; `[ ]` brakujące, wyłączone albo ograniczo
   inne targety nie mają dostarczonej biblioteki SQLite fire.
 - [ ] **Pełne testy natywnego ABI.** Strict native tests obejmują obecnie callbacki i VFS;
   pozostałe C-only operacje są pokrywane głównie przez testy Mojo lub nie mają osobnych
-  testów C. ASan/UBSan uruchamiają te same dwa natywne testy lokalnie i nie są krokiem CI.
+  testów C. ASan/UBSan uruchamiają te same dwa natywne testy lokalnie.
 - [ ] **Współbieżny unregister VFS.** Wyrejestrowanie odrzuca aktywne/in-flight pliki;
   równoczesne rozpoczynanie nowych otwarć i unregister wymaga zewnętrznej synchronizacji.
 - [ ] **Odzyskiwanie tokenów callbacków.** Dla bezpieczeństwa powtórnego `close` zamknięte
@@ -192,8 +192,8 @@ Pełna suite Mojo oraz natywne testy strict:
 ```
 
 Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
-ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu. To jest ta sama
-ścieżka wykonywana w CI (`pixi run ./scripts/test.sh`).
+ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu. Weryfikacja
+jest lokalna (`pixi run ./scripts/test.sh`); remote CI nie istnieje.
 
 Ręczne testy natywnego ABI:
 
@@ -201,8 +201,7 @@ Ręczne testy natywnego ABI:
 make -C native strict-test
 ```
 
-Sanitizery są dostępne lokalnie przez `make -C native sanitize`; nie są obecnie uruchamiane
-w CI.
+Sanitizery są dostępne lokalnie przez `make -C native sanitize`.
 
 Suite Mojo obejmuje kontrakty inspirowane CPython `sqlite3`, rusqlite i go-sqlite3:
 transakcje i rollback, autocommit, `ROW`/`DONE`, bindingi, NULL/TEXT/BLOB, błędy zakresu
