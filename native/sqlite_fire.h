@@ -66,7 +66,11 @@ typedef int (*sf_commit_fn)(void *userdata);
 typedef void (*sf_rollback_fn)(void *userdata);
 typedef int (*sf_wal_fn)(void *userdata, sqlite3 *database, const char *name, int pages);
 typedef int (*sf_busy_fn)(void *userdata, int attempts);
-/* Opaque lifecycle tokens for safely owned scalar and collation registrations. */
+/*
+ * Canonical scalar/collation lifecycle: register returns one opaque token;
+ * sf_callback_token_close unregisters it and is idempotent. userdata remains
+ * caller-owned and must outlive the active token.
+ */
 typedef struct sf_callback_token sf_callback_token;
 /* Closing is idempotent; the token remains a safe opaque tombstone after close. */
 int sf_callback_token_close(sf_callback_token *token);
@@ -77,10 +81,6 @@ int sf_register_collation(sf_db *db, const char *name, int text_encoding,
                           sf_collation_fn callback, void *userdata,
                           sf_callback_token **out_token);
 
-int sf_create_scalar_function(sf_db *db, const char *name, int argument_count, int text_encoding, sf_scalar_fn callback, void *userdata);
-int sf_remove_scalar_function(sf_db *db, const char *name, int argument_count, int text_encoding);
-int sf_create_collation(sf_db *db, const char *name, int text_encoding, sf_collation_fn callback, void *userdata);
-int sf_remove_collation(sf_db *db, const char *name, int text_encoding);
 int sf_set_authorizer(sf_db *db, sf_authorizer_fn callback, void *userdata);
 int sf_clear_authorizer(sf_db *db);
 int sf_set_progress_handler(sf_db *db, int instruction_count, sf_progress_fn callback, void *userdata);

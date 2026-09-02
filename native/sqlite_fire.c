@@ -334,9 +334,6 @@ const char *sf_column_table_name(sf_stmt *stmt, int column) { return stmt == NUL
 const char *sf_column_origin_name(sf_stmt *stmt, int column) { return stmt == NULL || stmt->handle == NULL ? NULL : sqlite3_column_origin_name(stmt->handle, column); }
 const char *sf_column_decltype(sf_stmt *stmt, int column) { return stmt == NULL || stmt->handle == NULL ? NULL : sqlite3_column_decltype(stmt->handle, column); }
 
-struct sf_scalar_callback { sf_scalar_fn callback; void *userdata; };
-struct sf_collation_callback { sf_collation_fn callback; void *userdata; };
-
 static void sf_token_scalar_trampoline(sqlite3_context *context, int argc, sqlite3_value **argv) {
     sf_callback_token *token = (sf_callback_token *)sqlite3_user_data(context);
     if (token != NULL && token->active && token->callback.scalar != NULL)
@@ -362,31 +359,6 @@ static void sf_token_mark_replaced(sf_db *db, const char *name, int argument_cou
     }
 }
 
-static void sf_scalar_trampoline(sqlite3_context *context, int argc, sqlite3_value **argv) {
-    struct sf_scalar_callback *cb = (struct sf_scalar_callback *)sqlite3_user_data(context);
-    if (cb != NULL && cb->callback != NULL) cb->callback(cb->userdata, context, argc, argv);
-    else sqlite3_result_error_code(context, SQLITE_MISUSE);
-}
-static void sf_scalar_destroy(void *p) { free(p); }
-static int sf_collation_trampoline(void *p, int left_length, const void *left, int right_length, const void *right) {
-    struct sf_collation_callback *cb = (struct sf_collation_callback *)p;
-    return cb == NULL || cb->callback == NULL ? 0 : cb->callback(cb->userdata, left_length, left, right_length, right);
-}
-static void sf_collation_destroy(void *p) { free(p); }
-
-int sf_create_scalar_function(sf_db *db, const char *name, int argument_count, int text_encoding, sf_scalar_fn callback, void *userdata) {
-    if (db == NULL || db->handle == NULL || name == NULL || name[0] == '\0' || callback == NULL) return SQLITE_MISUSE;
-    if (argument_count < -1 || argument_count > 127) return SQLITE_MISUSE;
-    struct sf_scalar_callback *cb = (struct sf_scalar_callback *)malloc(sizeof(*cb));
-    if (cb == NULL) return SQLITE_NOMEM;
-    cb->callback = callback; cb->userdata = userdata;
-    int result = sqlite3_create_function_v2(db->handle, name, argument_count, text_encoding, cb, sf_scalar_trampoline, NULL, NULL, sf_scalar_destroy);
-    return result;
-}
-int sf_remove_scalar_function(sf_db *db, const char *name, int argument_count, int text_encoding) {
-    if (db == NULL || db->handle == NULL || name == NULL || name[0] == '\0' || argument_count < -1 || argument_count > 127) return SQLITE_MISUSE;
-    return sqlite3_create_function_v2(db->handle, name, argument_count, text_encoding, NULL, NULL, NULL, NULL, NULL);
-}
 static char *sf_token_strdup(const char *text) {
     size_t length = strlen(text) + 1;
     char *copy = (char *)malloc(length);
@@ -446,20 +418,6 @@ int sf_callback_token_close(sf_callback_token *token) {
     token->db = NULL;
     return result;
 }
-int sf_create_collation(sf_db *db, const char *name, int text_encoding, sf_collation_fn callback, void *userdata) {
-    if (db == NULL || db->handle == NULL || name == NULL || name[0] == '\0' || callback == NULL) return SQLITE_MISUSE;
-    struct sf_collation_callback *cb = (struct sf_collation_callback *)malloc(sizeof(*cb));
-    if (cb == NULL) return SQLITE_NOMEM;
-    cb->callback = callback; cb->userdata = userdata;
-    int result = sqlite3_create_collation_v2(db->handle, name, text_encoding, cb, sf_collation_trampoline, sf_collation_destroy);
-    if (result != SQLITE_OK) free(cb);
-    return result;
-}
-int sf_remove_collation(sf_db *db, const char *name, int text_encoding) {
-    if (db == NULL || db->handle == NULL || name == NULL || name[0] == '\0') return SQLITE_MISUSE;
-    return sqlite3_create_collation_v2(db->handle, name, text_encoding, NULL, NULL, NULL);
-}
-
 int sf_set_authorizer(sf_db *db, sf_authorizer_fn callback, void *userdata) {
     if (db == NULL || db->handle == NULL || callback == NULL) return SQLITE_MISUSE;
     return sqlite3_set_authorizer(db->handle, callback, userdata);

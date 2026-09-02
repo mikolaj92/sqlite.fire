@@ -21,19 +21,21 @@ ani fałszywymi callbackami Mojo.
 
 ```sh
 pixi install
-pixi run ./scripts/test.sh
+pixi run test
 ```
 
-Bibliotekę natywną buduje runner testów. Przykład:
+Bibliotekę natywną buduje runner testów. Przykład uruchamia zadanie smoke:
 
 ```sh
-make -C native
-pixi run mojo run -I src examples/basic.mojo
+pixi run smoke
 ```
 
 Na macOS powstaje `native/libsqlite_fire.dylib`, a na Linuxie
-`native/libsqlite_fire.so`. Runner ustawia `DYLD_LIBRARY_PATH` albo `LD_LIBRARY_PATH`
-automatycznie.
+`native/libsqlite_fire.so`. Wrapper znajduje most przez jeden kontrakt:
+`SQLITE_FIRE_LIBRARY` może wskazać istniejący plik absolutną ścieżką, a bez tej
+zmiennej systemowy loader szuka `libsqlite_fire.dylib` albo `libsqlite_fire.so`.
+Runner ustawia `SQLITE_FIRE_LIBRARY` automatycznie. Żadna ścieżka nie zależy od
+bieżącego katalogu procesu.
 
 ## Co jest zaimplementowane
 
@@ -97,8 +99,8 @@ i utworzonych przez niego zasobów.
 - otwieranie (`sf_open`, `sf_open_options`), diagnostykę, metadane bazy i kolumn,
   interrupt, limity oraz wszystkie podstawowe operacje statementów;
 - incremental BLOB, backup, `sf_serialize`/`sf_serialize_status`, deserialize i `sf_free`;
-- tokenizowane `sf_register_scalar_function`/`sf_register_collation` oraz starsze
-  `sf_create_*`/`sf_remove_*` APIs;
+- tokenizowane `sf_register_scalar_function`/`sf_register_collation` z jednym
+  kanonicznym lifecycle przez idempotentne `sf_callback_token_close`;
 - authorizer, progress, trace, update, commit, rollback, WAL i busy hooks;
 - rejestrację i wyrejestrowanie passthrough VFS;
 - `sf_enable_load_extension` i `sf_load_extension` na platformach z dynamicznym loaderem;
@@ -170,30 +172,31 @@ jest zalecane; zachowanie po `sqlite3_close_v2` opisano wyżej jako obserwację,
 ## Uruchomienie przykładu
 
 ```sh
-make -C native
-pixi run mojo run -I src examples/basic.mojo
+pixi run smoke
 ```
 
 Przykład jawnie zamyka statementy i połączenie.
 
 ## Testy
 
-Pojedynczy test Mojo:
+Szybki przykład produktu:
 
 ```sh
-pixi run mojo run -I src tests/test_sqlite.mojo
+pixi run smoke
 ```
 
-Równoważne zadania `pixi` (`smoke` i `test`) uruchamiają przykład albo pojedynczy test.
-Pełna suite Mojo oraz natywne testy strict:
+Jedno kanoniczne zadanie `test` uruchamia pełną suite Mojo oraz natywne testy strict:
 
 ```sh
-./scripts/test.sh
+pixi run test
 ```
+
+`[tool.lokay] test` wskazuje to samo zadanie. Opcjonalne `uv run pytest` sprawdza
+wyłącznie pin toolchainu i nie zastępuje pełnej suite.
 
 Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
 ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu. Weryfikacja
-jest lokalna (`pixi run ./scripts/test.sh`); remote CI nie istnieje.
+jest lokalna (`pixi run test`); remote CI nie istnieje.
 
 Ręczne testy natywnego ABI:
 

@@ -14,10 +14,10 @@ make -B -C native all
 
 case "$(uname -s)" in
     Darwin)
-        export DYLD_LIBRARY_PATH="$ROOT/native${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+        export SQLITE_FIRE_LIBRARY="$ROOT/native/libsqlite_fire.dylib"
         ;;
     Linux)
-        export LD_LIBRARY_PATH="$ROOT/native${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        export SQLITE_FIRE_LIBRARY="$ROOT/native/libsqlite_fire.so"
         ;;
     *)
         echo "unsupported platform: $(uname -s) (supported: macOS, Linux)" >&2
@@ -28,6 +28,7 @@ esac
 for test in tests/*.mojo; do
     name=$(basename "$test" .mojo)
     output="$TMPDIR/$name"
+    printf 'Mojo test: %s\n' "$name"
     mojo build -I src "$test" -o "$output"
     "$output"
 done
