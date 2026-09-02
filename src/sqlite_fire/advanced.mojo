@@ -9,8 +9,8 @@ never closes the Connection-owned handle.
 from std.collections import List
 from std.ffi import CStringSlice, OwnedDLHandle, c_int, c_long_long
 from std.memory.alloc import alloc, Layout
-from std.sys import CompilationTarget
 from .sqlite import Connection, SQLiteError
+from .native_library import library_path
 
 comptime SQLITE_OK: Int32 = 0
 comptime SQLITE_ERROR: Int32 = 1
@@ -37,12 +37,6 @@ comptime SizeOut = MutPointer[UInt, MutUntrackedOrigin]
 
 comptime VfsPtr = MutPointer[UInt8, MutUntrackedOrigin]
 comptime VfsOut = MutPointer[VfsPtr, MutUntrackedOrigin]
-comptime LIBRARY_PATH = (
-    "native/libsqlite_fire.so" if CompilationTarget.is_linux()
-    else "native/libsqlite_fire.dylib" if CompilationTarget.is_macos()
-    else ""
-)
-
 def _cstring(mut value: String) raises -> CStringSlice[origin_of(value)]:
     if value.byte_length() == 0 or value.as_bytes().unsafe_ptr().unsafe_offset(value.byte_length() - 1).unsafe_load() != 0:
         value += "\0"
@@ -66,7 +60,7 @@ struct PassthroughVFS(Movable):
         self._closed = True
         self._vfs = VfsPtr(unsafe_from_address=1)
         try:
-            self._library = OwnedDLHandle(LIBRARY_PATH)
+            self._library = OwnedDLHandle(library_path())
         except e:
             raise Error(String(_error(Int(SQLITE_MISUSE), String(e))))
         var name_value = name
@@ -110,7 +104,7 @@ struct AdvancedDatabase(Movable):
         self._extensions_enabled = False
         self._db = DbPtr(unsafe_from_address=1)
         try:
-            self._library = OwnedDLHandle(LIBRARY_PATH)
+            self._library = OwnedDLHandle(library_path())
         except e:
             raise Error(String(_error(Int(SQLITE_MISUSE), String(e))))
         var holder = alloc(Layout[DbPtr].single()).into_managed()
@@ -132,7 +126,7 @@ struct AdvancedDatabase(Movable):
         self._db = DbPtr(unsafe_from_address=1)
         var db = connection._raw_db()
         try:
-            self._library = OwnedDLHandle(LIBRARY_PATH)
+            self._library = OwnedDLHandle(library_path())
         except e:
             raise Error(String(_error(Int(SQLITE_MISUSE), String(e))))
         self._db = db
@@ -262,7 +256,7 @@ struct IncrementalBlob(Movable):
         self._closed = True
         self._blob = BlobPtr(unsafe_from_address=1)
         try:
-            self._library = OwnedDLHandle(LIBRARY_PATH)
+            self._library = OwnedDLHandle(library_path())
         except e:
             raise Error(String(_error(Int(SQLITE_MISUSE), String(e))))
         var schema_value = schema
@@ -358,7 +352,7 @@ struct Backup(Movable):
         self._finished = True
         self._backup = BlobPtr(unsafe_from_address=1)
         try:
-            self._library = OwnedDLHandle(LIBRARY_PATH)
+            self._library = OwnedDLHandle(library_path())
         except e:
             raise Error(String(_error(Int(SQLITE_MISUSE), String(e))))
         var dest_value = dest_schema

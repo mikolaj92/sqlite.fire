@@ -123,50 +123,44 @@ static const char *query_text(sf_db *db, const char *sql) {
 static void test_scalar_lifecycle(sf_db *db) {
     int offset = 7;
     scalar_calls = 0;
-    assert(sf_create_scalar_function(NULL, "native_add", 1, SQLITE_UTF8, scalar_add, &offset) == SQLITE_MISUSE);
-    assert(sf_create_scalar_function(db, NULL, 1, SQLITE_UTF8, scalar_add, &offset) == SQLITE_MISUSE);
-    assert(sf_create_scalar_function(db, "native_add", 1, SQLITE_UTF8, NULL, &offset) == SQLITE_MISUSE);
-    assert(sf_create_scalar_function(db, "native_add", -2, SQLITE_UTF8, scalar_add, &offset) == SQLITE_MISUSE);
-    assert(sf_create_scalar_function(db, "native_add", 128, SQLITE_UTF8, scalar_add, &offset) == SQLITE_MISUSE);
-
-    assert(sf_create_scalar_function(db, "native_add", 1, SQLITE_UTF8, scalar_add, &offset) == SQLITE_OK);
+    sf_callback_token *token = NULL;
+    assert(sf_register_scalar_function(NULL, "native_add", 1, SQLITE_UTF8, scalar_add, &offset, &token) == SQLITE_MISUSE);
+    assert(sf_register_scalar_function(db, NULL, 1, SQLITE_UTF8, scalar_add, &offset, &token) == SQLITE_MISUSE);
+    assert(sf_register_scalar_function(db, "native_add", 1, SQLITE_UTF8, NULL, &offset, &token) == SQLITE_MISUSE);
+    assert(sf_register_scalar_function(db, "native_add", -2, SQLITE_UTF8, scalar_add, &offset, &token) == SQLITE_MISUSE);
+    assert(sf_register_scalar_function(db, "native_add", 128, SQLITE_UTF8, scalar_add, &offset, &token) == SQLITE_MISUSE);
+    assert(sf_register_scalar_function(db, "native_add", 1, SQLITE_UTF8, scalar_add, &offset, &token) == SQLITE_OK);
     assert(query_int(db, "SELECT native_add(5)") == 12);
     assert(scalar_calls == 1);
-
-    assert(sf_create_scalar_function(db, "native_add", 1, SQLITE_UTF8, scalar_replacement, NULL) == SQLITE_OK);
+    sf_callback_token *replacement = NULL;
+    assert(sf_register_scalar_function(db, "native_add", 1, SQLITE_UTF8, scalar_replacement, NULL, &replacement) == SQLITE_OK);
     assert(query_int(db, "SELECT native_add(5)") == 50);
     assert(scalar_calls == 2);
-
-    assert(sf_remove_scalar_function(db, "native_add", 1, SQLITE_UTF8) == SQLITE_OK);
-    assert(sf_remove_scalar_function(db, "native_add", 1, SQLITE_UTF8) == SQLITE_OK);
+    assert(sf_callback_token_close(token) == SQLITE_OK);
+    assert(sf_callback_token_close(replacement) == SQLITE_OK);
     sf_stmt *stmt = NULL;
     assert(sf_prepare(db, "SELECT native_add(5)", &stmt) != SQLITE_OK);
     assert(stmt == NULL);
-    assert(scalar_calls == 2);
-    assert(sf_remove_scalar_function(NULL, "native_add", 1, SQLITE_UTF8) == SQLITE_MISUSE);
-    assert(sf_remove_scalar_function(db, NULL, 1, SQLITE_UTF8) == SQLITE_MISUSE);
 }
 
 static void test_collation_lifecycle(sf_db *db) {
     collation_calls = 0;
     assert(sf_exec(db, "CREATE TABLE words(value TEXT)") == SQLITE_OK);
     assert(sf_exec(db, "INSERT INTO words VALUES ('a'), ('b')") == SQLITE_OK);
-    assert(sf_create_collation(NULL, "NATIVE_REVERSE", SQLITE_UTF8, reverse_collation, NULL) == SQLITE_MISUSE);
-    assert(sf_create_collation(db, NULL, SQLITE_UTF8, reverse_collation, NULL) == SQLITE_MISUSE);
-    assert(sf_create_collation(db, "NATIVE_REVERSE", SQLITE_UTF8, NULL, NULL) == SQLITE_MISUSE);
-    assert(sf_create_collation(db, "NATIVE_REVERSE", SQLITE_UTF8, reverse_collation, NULL) == SQLITE_OK);
+    sf_callback_token *token = NULL;
+    assert(sf_register_collation(NULL, "NATIVE_REVERSE", SQLITE_UTF8, reverse_collation, NULL, &token) == SQLITE_MISUSE);
+    assert(sf_register_collation(db, NULL, SQLITE_UTF8, reverse_collation, NULL, &token) == SQLITE_MISUSE);
+    assert(sf_register_collation(db, "NATIVE_REVERSE", SQLITE_UTF8, NULL, NULL, &token) == SQLITE_MISUSE);
+    assert(sf_register_collation(db, "NATIVE_REVERSE", SQLITE_UTF8, reverse_collation, NULL, &token) == SQLITE_OK);
     assert(strcmp(query_text(db, "SELECT value FROM words ORDER BY value COLLATE NATIVE_REVERSE LIMIT 1"), "b") == 0);
     assert(collation_calls > 0);
-
-    assert(sf_remove_collation(db, "NATIVE_REVERSE", SQLITE_UTF8) == SQLITE_OK);
-    assert(sf_remove_collation(db, "NATIVE_REVERSE", SQLITE_UTF8) == SQLITE_OK);
-    int calls_after_remove = collation_calls;
+    assert(sf_callback_token_close(token) == SQLITE_OK);
+    assert(sf_callback_token_close(token) == SQLITE_OK);
+    int calls_after_close = collation_calls;
     sf_stmt *stmt = NULL;
     assert(sf_prepare(db, "SELECT value FROM words ORDER BY value COLLATE NATIVE_REVERSE", &stmt) != SQLITE_OK);
     assert(stmt == NULL);
-    assert(collation_calls == calls_after_remove);
-    assert(sf_remove_collation(NULL, "NATIVE_REVERSE", SQLITE_UTF8) == SQLITE_MISUSE);
-    assert(sf_remove_collation(db, NULL, SQLITE_UTF8) == SQLITE_MISUSE);
+    assert(collation_calls == calls_after_close);
 }
 
 static void test_progress_lifecycle(sf_db *db) {

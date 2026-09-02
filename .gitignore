@@ -10,3 +10,9 @@ native/libsqlite_fire.so
 /test_*
 .fala-effector-*/
 .dike_audit/
+
+.pixi/
+__mojocache__/
+.pytest_cache/
+native/.native-tests/
+dist/

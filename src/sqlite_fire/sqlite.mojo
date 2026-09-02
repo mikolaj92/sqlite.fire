@@ -2,7 +2,7 @@
 from std.collections import List
 from std.ffi import CStringSlice, OwnedDLHandle, c_double, c_int, c_long_long
 from std.memory.alloc import alloc, Layout
-from std.sys import CompilationTarget
+from .native_library import library_path
 
 comptime SQLITE_ERROR: Int32 = 1
 comptime SQLITE_OK: Int32 = 0
@@ -253,12 +253,6 @@ comptime CStrOut = MutPointer[CStr, MutUntrackedOrigin]
 comptime BlobPtr = MutPointer[UInt8, MutUntrackedOrigin]
 
 
-comptime LIBRARY_PATH = (
-    "native/libsqlite_fire.so" if CompilationTarget.is_linux()
-    else "native/libsqlite_fire.dylib" if CompilationTarget.is_macos()
-    else ""
-)
-
 def _cstring(mut value: String) raises -> CStringSlice[origin_of(value)]:
     if value.byte_length() == 0 or value.as_bytes().unsafe_ptr().unsafe_offset(value.byte_length() - 1).unsafe_load() != 0:
         value += "\0"
@@ -280,7 +274,7 @@ struct Connection(Movable):
         self._db = DbPtr(unsafe_from_address=1)
         var open_result: Int32
         try:
-            self._library = OwnedDLHandle(LIBRARY_PATH)
+            self._library = OwnedDLHandle(library_path())
             var holder = alloc(Layout[DbPtr].single()).into_managed()
             var filename = path
             var filename_c = _cstring(filename)
@@ -299,7 +293,7 @@ struct Connection(Movable):
         self._db = DbPtr(unsafe_from_address=1)
         var open_result: Int32
         try:
-            self._library = OwnedDLHandle(LIBRARY_PATH)
+            self._library = OwnedDLHandle(library_path())
             var holder = alloc(Layout[DbPtr].single()).into_managed()
             var filename = path
             var filename_c = _cstring(filename)
@@ -506,7 +500,7 @@ struct Statement(Movable):
     var _closed: Bool
     def __init__(out self, stmt: StmtPtr) raises:
         try:
-            self._library = OwnedDLHandle(LIBRARY_PATH)
+            self._library = OwnedDLHandle(library_path())
             self._stmt = stmt
             self._closed = False
         except e:
