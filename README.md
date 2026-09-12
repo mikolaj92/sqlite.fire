@@ -73,6 +73,10 @@ wartości do SQL nie jest obsługiwana jako bezpieczny mechanizm.
 
 `OpenOptions` domyślnie używa `SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI`.
 `SQLiteValue` zachowuje rozróżnienie między SQL `NULL`, pustym tekstem i pustym BLOB-em.
+Kody wyniku (`SQLITE_ERROR`, `SQLITE_BUSY`, …) i kody typów kolumn (`SQLITE_INTEGER_TYPE`,
+`SQLITE_NULL_TYPE`, …) to osobne rodziny nazw. SQLite w C używa tych samych liczb (`1` i `5`)
+w dwóch enumach; `error_code()` porównuj tylko z kodami wyniku, a `column_type()` / `kind`
+tylko z `SQLITE_*_TYPE`. Nie porównuj ich krzyżowo.
 `serialize()` zwraca skopiowane dane Mojo; flaga `SQLITE_SERIALIZE_NOCOPY` jest odrzucana.
 `PassthroughVFS` należy zamknąć dopiero po zamknięciu wszystkich baz otwartych z jego nazwą.
 
@@ -104,7 +108,9 @@ i utworzonych przez niego zasobów.
 - authorizer, progress, trace, update, commit, rollback, WAL i busy hooks;
 - rejestrację i wyrejestrowanie passthrough VFS;
 - `sf_enable_load_extension` i `sf_load_extension` na platformach z dynamicznym loaderem;
-- typed SQLite result codes bez zastępowania ich ogólnym błędem.
+- typed SQLite result codes bez zastępowania ich ogólnym błędem; kody wyniku
+  (`sf_errcode`, `sf_step`) nie są kodami typów kolumn (`sf_column_type` /
+  `sqlite3_column_type`).
 
 Callbacki natywne otrzymują synchroniczne wskaźniki SQLite i są przeznaczone dla kodu C.
 `userdata` pozostaje własnością wywołującego i musi żyć przez cały czas rejestracji;
