@@ -198,7 +198,8 @@ pixi run test
 ```
 
 `[tool.lokay] test` wskazuje to samo zadanie. Opcjonalne `uv run pytest` sprawdza
-wyłącznie pin toolchainu i nie zastępuje pełnej suite.
+pin toolchainu i kontrakt nazw (`SQLITE_BUSY` vs `SQLITE_NULL_TYPE`) i nie zastępuje
+pełnej suite Mojo.
 
 Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
 ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu. Weryfikacja
