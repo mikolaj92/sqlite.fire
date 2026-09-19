@@ -191,15 +191,15 @@ Szybki przykład produktu:
 pixi run smoke
 ```
 
-Jedno kanoniczne zadanie `test` uruchamia pełną suite Mojo oraz natywne testy strict:
+Jedno kanoniczne zadanie `test` uruchamia kontrakt nazw (`SQLITE_BUSY` vs
+`SQLITE_NULL_TYPE`), pełną suite Mojo oraz natywne testy strict:
 
 ```sh
 pixi run test
 ```
 
-`[tool.lokay] test` wskazuje to samo zadanie. Opcjonalne `uv run pytest` sprawdza
-pin toolchainu i kontrakt nazw (`SQLITE_BUSY` vs `SQLITE_NULL_TYPE`) i nie zastępuje
-pełnej suite Mojo.
+`[tool.lokay] test` wskazuje to samo zadanie. Opcjonalne `uv run pytest` powtarza
+pin toolchainu i kontrakt nazw i nie zastępuje pełnej suite Mojo.
 
 Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
 ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu. Weryfikacja
