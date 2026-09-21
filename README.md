@@ -75,8 +75,11 @@ wartości do SQL nie jest obsługiwana jako bezpieczny mechanizm.
 `SQLiteValue` zachowuje rozróżnienie między SQL `NULL`, pustym tekstem i pustym BLOB-em.
 Kody wyniku (`SQLITE_ERROR`, `SQLITE_BUSY`, …) i kody typów kolumn (`SQLITE_INTEGER_TYPE`,
 `SQLITE_NULL_TYPE`, …) to osobne rodziny nazw. SQLite w C używa tych samych liczb (`1` i `5`)
-w dwóch enumach; `error_code()` porównuj tylko z kodami wyniku, a `column_type()` / `kind`
-tylko z `SQLITE_*_TYPE`. Nie porównuj ich krzyżowo.
+w dwóch rodzinach makr; `error_code()` porównuj tylko z kodami wyniku, a `column_type()` / `kind`
+tylko z `SQLITE_*_TYPE`. Nie porównuj ich krzyżowo. To rozdział nazw, nie statycznych typów:
+stałe nadal mają typ `Int32`. Dotychczasowe importy typów kolumn (`SQLITE_INTEGER`,
+`SQLITE_REAL`, `SQLITE_TEXT`, `SQLITE_BLOB`, `SQLITE_NULL`) należy zmienić na nazwy
+z sufiksem `_TYPE`; nazwy kodów wyniku i ABI C pozostają bez zmian.
 `serialize()` zwraca skopiowane dane Mojo; flaga `SQLITE_SERIALIZE_NOCOPY` jest odrzucana.
 `PassthroughVFS` należy zamknąć dopiero po zamknięciu wszystkich baz otwartych z jego nazwą.
 
