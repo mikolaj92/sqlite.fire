@@ -67,9 +67,10 @@ def main() raises:
     assert not null_row.column_null(1)
     assert null_row.column_type(1) == Int(SQLITE_INTEGER_TYPE)
     assert null_row.column_int(1) == 1
+    # Finalize the successful query before checking recovery's idle state.
+    null_row.close()
     assert contender.error_code() == 0
     assert contender.extended_error_code() == 0
-    null_row.close()
     contender.close()
     read_write.close()
 

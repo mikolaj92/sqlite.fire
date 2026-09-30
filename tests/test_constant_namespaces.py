@@ -93,8 +93,10 @@ def test_public_modules_do_not_alias_bare_datatype_names():
 
 
 def _code_lines(text: str):
-    for line in text.splitlines():
-        yield line.split("#", 1)[0]
+    # Mask literals before comments: a # inside SQL is not a Mojo comment.
+    literals = re.compile(r'''"""[\s\S]*?"""|\x27\x27\x27[\s\S]*?\x27\x27\x27|"(?:\\.|[^"\\])*"|\x27(?:\\.|[^\x27\\])*\x27|\#[^\n]*''')
+    text = literals.sub(lambda m: " " + "\n" * m.group().count("\n"), text)
+    yield from text.splitlines()
 
 
 def _code_statements(text: str):
@@ -147,7 +149,7 @@ def test_mojo_sources_do_not_use_bare_datatype_names():
             assert match is None, f"{path}: {match.group(1)}"
 
 
-def test_mojo_does_not_cross_compare_result_codes_with_column_types():
+def _crosses_namespaces(text: str) -> bool:
     # error_code(e) == Int(SQLITE_NULL_TYPE) is the original BUSY/NULL footgun.
     # SQLiteError.code == SQLITE_NULL_TYPE is the same collision on the field.
     # SQLITE_ERROR == SQLITE_INTEGER_TYPE is the same collision under renamed types.
@@ -159,25 +161,66 @@ def test_mojo_does_not_cross_compare_result_codes_with_column_types():
     result_name = re.compile(
         r"\bSQLITE_(?:OK|ERROR|BUSY|READONLY|NOTFOUND|CANTOPEN|CONSTRAINT|MISUSE|RANGE|ROW|DONE|NOMEM)\b"
     )
-    compare = re.compile(r"==|!=")
-    kind_assign = re.compile(r"\bkind\s*=")
-    code_assign = re.compile(r"\bcode\s*=")
+    for stmt in _code_statements(text):
+        # These direct expressions share Python syntax; this is a bounded
+        # source contract, not a Mojo parser or a dataflow/type checker.
+        stmt = re.sub(r"^(?:var|comptime)\s+", "", stmt)
+        stmt = re.sub(r"^(?:if|elif|while)\s+", "", stmt).removesuffix(":")
+        try:
+            tree = ast.parse(stmt)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Compare):
+                operands = [node.left, *node.comparators]
+                for left, right in zip(operands, operands[1:]):
+                    pair = ast.unparse(left) + " " + ast.unparse(right)
+                    if (result_api.search(pair) and type_name.search(pair)
+                        or type_api.search(pair) and result_name.search(pair)
+                        or result_name.search(pair) and type_name.search(pair)):
+                        return True
+            elif isinstance(node, ast.keyword) and node.arg in ("kind", "code"):
+                value = ast.unparse(node.value)
+                if (node.arg == "kind" and result_name.search(value)
+                    or node.arg == "code" and type_name.search(value)):
+                    return True
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                value = ast.unparse(node.value) if node.value is not None else ""
+                for target in targets:
+                    name = ast.unparse(target).split(".")[-1]
+                    if (name == "kind" and result_name.search(value)
+                        or name == "code" and type_name.search(value)):
+                        return True
+    return False
+
+
+def test_mojo_does_not_cross_compare_result_codes_with_column_types():
     for path in _mojo_sources():
-        for stmt in _code_statements(path.read_text()):
-            # kind=Int(SQLITE_BUSY) / code=Int(SQLITE_NULL_TYPE) is the same
-            # collision without a comparison operator.
-            if kind_assign.search(stmt) and result_name.search(stmt):
-                raise AssertionError(f"{path}: {stmt}")
-            if code_assign.search(stmt) and type_name.search(stmt):
-                raise AssertionError(f"{path}: {stmt}")
-            if not compare.search(stmt):
-                continue
-            if result_api.search(stmt) and type_name.search(stmt):
-                raise AssertionError(f"{path}: {stmt}")
-            if type_api.search(stmt) and result_name.search(stmt):
-                raise AssertionError(f"{path}: {stmt}")
-            if result_name.search(stmt) and type_name.search(stmt):
-                raise AssertionError(f"{path}: {stmt}")
+        assert not _crosses_namespaces(path.read_text()), str(path)
+
+
+def test_namespace_scanner_ignores_literals_and_independent_operands():
+    valid = '''assert db.error_code() == Int(SQLITE_OK) and rows.column_type(0) == Int(SQLITE_INTEGER_TYPE)
+assert (rows.kind == Int(SQLITE_NULL_TYPE)) or (db.code == Int(SQLITE_BUSY))
+return Value(kind=Int(SQLITE_NULL_TYPE), code=Int(SQLITE_BUSY))
+var sql = "SELECT 'SQLITE_NULL', '# SQLITE_INTEGER'"
+"""SQLITE_NULL and error_code(e) == SQLITE_NULL_TYPE"""
+# SQLITE_INTEGER
+'''
+    assert not _crosses_namespaces(valid)
+    assert "SQLITE_NULL" not in "\n".join(_code_lines(valid)).split("var sql", 1)[1]
+    for invalid in (
+        "assert db.error_code() == Int(SQLITE_NULL_TYPE)",
+        "assert rows.column_type(0) != Int(SQLITE_BUSY)",
+        "assert SQLITE_ERROR == SQLITE_INTEGER_TYPE",
+        "return Value(kind=Int(SQLITE_BUSY), code=Int(SQLITE_ERROR))",
+        "return Value(kind=Int(SQLITE_NULL_TYPE), code=Int(SQLITE_NULL_TYPE))",
+        "var kind = Int(SQLITE_BUSY)",
+        "db.code = Int(SQLITE_INTEGER_TYPE)",
+        "assert error_code(e) == Int(\nSQLITE_NULL_TYPE)",
+    ):
+        assert _crosses_namespaces(invalid), invalid
 
 
 def test_canonical_runner_gates_name_families():
