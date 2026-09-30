@@ -29,6 +29,9 @@ def main() raises:
     # A payload equal to BUSY / NULL's numeric code is still an INTEGER value.
     var types = db.query("SELECT 5, NULL, 2.5, 'text', x'01'\0")
     assert types.step_code() == Int(SQLITE_ROW)
+    # Check the step result before column access can update connection state.
+    assert db.error_code() == Int(SQLITE_ROW)
+    assert db.extended_error_code() == Int(SQLITE_ROW)
     assert types.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert types.column_type(1) == Int(SQLITE_NULL_TYPE)
     assert types.column_type(2) == Int(SQLITE_REAL_TYPE)
@@ -43,7 +46,8 @@ def main() raises:
     assert types.column_value(3).kind == Int(SQLITE_TEXT_TYPE)
     assert types.column_value(4).kind == Int(SQLITE_BLOB_TYPE)
     # Reading INTEGER / NULL must not set ERROR / BUSY on the connection,
-    # despite their shared integer values in SQLite's C API.
+    # despite their shared integer values in SQLite's C API. Column value
+    # access has cleared the prior SQLITE_ROW state to SQLITE_OK.
     assert db.error_code() == Int(SQLITE_OK)
     assert db.extended_error_code() == Int(SQLITE_OK)
     assert not types.column_null(0)
@@ -65,6 +69,8 @@ def main() raises:
     # NULL as datatypes, while clearing the connection's result-code state.
     var recovered = db.query("SELECT 1, NULL\0")
     assert recovered.step_code() == Int(SQLITE_ROW)
+    assert db.error_code() == Int(SQLITE_ROW)
+    assert db.extended_error_code() == Int(SQLITE_ROW)
     assert recovered.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert recovered.column_type(1) == Int(SQLITE_NULL_TYPE)
     assert recovered.column_value(0).kind == Int(SQLITE_INTEGER_TYPE)
@@ -72,6 +78,7 @@ def main() raises:
     assert not recovered.column_value(0).is_null()
     assert recovered.column_value(1).kind == Int(SQLITE_NULL_TYPE)
     assert recovered.column_value(1).is_null()
+    # Column value access clears SQLITE_ROW; neither datatype is an error.
     assert db.error_code() == Int(SQLITE_OK)
     assert db.extended_error_code() == Int(SQLITE_OK)
     assert recovered.step_code() == Int(SQLITE_DONE)
