@@ -111,7 +111,7 @@ i utworzonych przez niego zasobów.
 - authorizer, progress, trace, update, commit, rollback, WAL i busy hooks;
 - rejestrację i wyrejestrowanie passthrough VFS;
 - `sf_enable_load_extension` i `sf_load_extension` na platformach z dynamicznym loaderem;
-- typed SQLite result codes bez zastępowania ich ogólnym błędem; kody wyniku
+- oryginalne liczbowe kody wyniku SQLite bez zastępowania ich ogólnym błędem; kody wyniku
   (`sf_errcode`, `sf_step`) nie są kodami typów kolumn (`sf_column_type` /
   `sqlite3_column_type`).
 
