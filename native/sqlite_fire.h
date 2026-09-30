@@ -12,11 +12,16 @@ typedef struct sf_db sf_db;
 typedef struct sf_stmt sf_stmt;
 typedef struct sf_vfs sf_vfs;
 
-/* SQLite results are SQLite-compatible: 0 means success. */
+/* SQLite results are SQLite-compatible: 0 means success.
+ * Result codes (sf_errcode, sf_step) and column datatypes (sf_column_type /
+ * sqlite3_column_type) use separate families of C macros that reuse integers 1 and 5.
+ * Do not compare a result code against a column type. */
 int sf_open(const char *filename, sf_db **out_db);
 int sf_close(sf_db *db);
 const char *sf_errmsg(sf_db *db);
+/* Result code from sqlite3_errcode, not a column datatype. */
 int sf_errcode(sf_db *db);
+/* Result code from sqlite3_extended_errcode, not a column datatype. */
 int sf_extended_errcode(sf_db *db);
 int sf_changes(sf_db *db);
 long long sf_last_insert_rowid(sf_db *db);
@@ -39,11 +44,13 @@ int sf_data_count(sf_stmt *stmt);
 int sf_reset(sf_stmt *stmt);
 int sf_clear_bindings(sf_stmt *stmt);
 int sf_busy_timeout(sf_db *db, int milliseconds);
+/* Result code from sqlite3_step, not a column datatype. */
 int sf_step(sf_stmt *stmt);
 int sf_finalize(sf_stmt *stmt);
 
 int sf_column_count(sf_stmt *stmt);
 const char *sf_column_name(sf_stmt *stmt, int column);
+/* Column datatype from sqlite3_column_type, not a result code. */
 int sf_column_type(sf_stmt *stmt, int column);
 long long sf_column_int64(sf_stmt *stmt, int column);
 double sf_column_double(sf_stmt *stmt, int column);

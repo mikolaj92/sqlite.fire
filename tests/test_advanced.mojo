@@ -1,6 +1,6 @@
 from std.collections import List
 from sqlite_fire import AdvancedDatabase, Connection, SQLiteValue
-from sqlite_fire.sqlite import SQLITE_BLOB, SQLITE_DONE, SQLITE_MISUSE, SQLITE_NULL, SQLITE_REAL, SQLITE_TEXT, error_code
+from sqlite_fire.sqlite import SQLITE_BLOB_TYPE, SQLITE_DONE, SQLITE_MISUSE, SQLITE_NULL_TYPE, SQLITE_REAL_TYPE, SQLITE_TEXT_TYPE, error_code
 
 
 def main() raises:
@@ -10,7 +10,7 @@ def main() raises:
     original.append(2)
     var blob_value = SQLiteValue.blob(original)
     original[0] = 9
-    assert blob_value.kind == Int(SQLITE_BLOB)
+    assert blob_value.kind == Int(SQLITE_BLOB_TYPE)
     assert blob_value.blob_value[0] == 1
     var blob_copy = blob_value.copy()
     blob_value.blob_value[0] = 8
@@ -36,14 +36,14 @@ def main() raises:
     var empty_blob = List[UInt8]()
     values.bind_value(5, SQLiteValue.blob(empty_blob))
     assert values.step()
-    assert values.column_value(0).kind == Int(SQLITE_NULL)
+    assert values.column_value(0).kind == Int(SQLITE_NULL_TYPE)
     assert values.column_value(1).integer_value == 7
     assert values.column_value(2).real_value == 2.5
     var text_result = values.column_value(3)
-    assert text_result.kind == Int(SQLITE_TEXT)
+    assert text_result.kind == Int(SQLITE_TEXT_TYPE)
     assert text_result.text_value == ""
     var blob_result = values.column_value(4)
-    assert blob_result.kind == Int(SQLITE_BLOB)
+    assert blob_result.kind == Int(SQLITE_BLOB_TYPE)
     assert len(blob_result.blob_value) == 0
     assert not values.step()
     values.close()

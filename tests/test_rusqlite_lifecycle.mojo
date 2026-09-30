@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_INTEGER, SQLITE_MISUSE, SQLITE_NULL, error_code
+from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_INTEGER_TYPE, SQLITE_MISUSE, SQLITE_NULL_TYPE, error_code
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -9,7 +9,7 @@ def main() raises:
     var reusable = db.query("SELECT ?\0")
     reusable.bind_int(1, 41)
     assert reusable.step()
-    assert reusable.column_type(0) == Int(SQLITE_INTEGER)
+    assert reusable.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert reusable.column_int(0) == 41
     reusable.reset()
     assert reusable.step()
@@ -21,7 +21,7 @@ def main() raises:
     reusable.reset()
     reusable.clear_bindings()
     assert reusable.step()
-    assert reusable.column_type(0) == Int(SQLITE_NULL)
+    assert reusable.column_type(0) == Int(SQLITE_NULL_TYPE)
     assert reusable.column_text(0) == ""
     assert not reusable.step()
     reusable.close()

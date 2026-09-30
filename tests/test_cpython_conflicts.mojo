@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_ERROR, SQLITE_INTEGER, error_code
+from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_ERROR, SQLITE_INTEGER_TYPE, error_code
 
 def main() raises:
     var db = Connection(":memory:")
@@ -26,7 +26,7 @@ def main() raises:
     var ignored_row = db.query("SELECT id, item_value FROM conflicts WHERE key = ?")
     ignored_row.bind_text(1, "stable")
     assert ignored_row.step()
-    assert ignored_row.column_type(0) == Int(SQLITE_INTEGER)
+    assert ignored_row.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert ignored_row.column_int(0) == original_rowid
     assert ignored_row.column_int(1) == 10
     assert not ignored_row.step()

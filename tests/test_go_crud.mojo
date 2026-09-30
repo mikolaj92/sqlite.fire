@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_INTEGER, error_code
+from sqlite_fire.sqlite import Connection, SQLITE_CONSTRAINT, SQLITE_INTEGER_TYPE, error_code
 
 def main() raises:
     var db = Connection(":memory:")
@@ -40,7 +40,7 @@ def main() raises:
     var replacement_row = db.query("SELECT id, qty FROM items WHERE key = ?")
     replacement_row.bind_text(1, "alpha")
     assert replacement_row.step()
-    assert replacement_row.column_type(0) == Int(SQLITE_INTEGER)
+    assert replacement_row.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert replacement_row.column_int(0) == 3
     assert replacement_row.column_int(1) == 30
     assert not replacement_row.step()

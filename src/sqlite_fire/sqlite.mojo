@@ -1,29 +1,41 @@
-"""Small, direct SQLite wrapper for Mojo."""
+"""Small, direct SQLite wrapper for Mojo.
+
+Result codes (``SQLITE_ERROR``, ``SQLITE_BUSY``, ...) and column datatypes
+(``SQLITE_INTEGER_TYPE``, ``SQLITE_NULL_TYPE``, ...) are separate name families.
+SQLite's C headers reuse the integers 1 and 5 across those macro families; do not compare
+a result code against a column type.
+"""
 from std.collections import List
 from std.ffi import CStringSlice, OwnedDLHandle, c_double, c_int, c_long_long
 from std.memory.alloc import alloc, Layout
 from .native_library import library_path
 
-comptime SQLITE_ERROR: Int32 = 1
+# Result codes from sqlite3.h. Compare these with ``error_code()`` / ``step_code()``.
 comptime SQLITE_OK: Int32 = 0
-comptime SQLITE_INTEGER: Int32 = 1
-comptime SQLITE_REAL: Int32 = 2
-comptime SQLITE_TEXT: Int32 = 3
-comptime SQLITE_BLOB: Int32 = 4
-comptime SQLITE_NULL: Int32 = 5
+comptime SQLITE_ERROR: Int32 = 1
 comptime SQLITE_BUSY: Int32 = 5
+comptime SQLITE_READONLY: Int32 = 8
+comptime SQLITE_NOTFOUND: Int32 = 12
+comptime SQLITE_CANTOPEN: Int32 = 14
 comptime SQLITE_CONSTRAINT: Int32 = 19
 comptime SQLITE_MISUSE: Int32 = 21
 comptime SQLITE_RANGE: Int32 = 25
-comptime SQLITE_CANTOPEN: Int32 = 14
-comptime SQLITE_NOTFOUND: Int32 = 12
-comptime SQLITE_READONLY: Int32 = 8
+comptime SQLITE_ROW: Int32 = 100
+comptime SQLITE_DONE: Int32 = 101
+
+# Column datatypes from sqlite3_column_type. Compare these with ``column_type()``
+# and ``SQLiteValue.kind``. SQLITE_INTEGER_TYPE is 1 like SQLITE_ERROR;
+# SQLITE_NULL_TYPE is 5 like SQLITE_BUSY — different names, same integers.
+comptime SQLITE_INTEGER_TYPE: Int32 = 1
+comptime SQLITE_REAL_TYPE: Int32 = 2
+comptime SQLITE_TEXT_TYPE: Int32 = 3
+comptime SQLITE_BLOB_TYPE: Int32 = 4
+comptime SQLITE_NULL_TYPE: Int32 = 5
+
 comptime SQLITE_OPEN_READONLY: Int32 = 0x00000001
 comptime SQLITE_OPEN_READWRITE: Int32 = 0x00000002
 comptime SQLITE_OPEN_CREATE: Int32 = 0x00000004
 comptime SQLITE_OPEN_URI: Int32 = 0x00000040
-comptime SQLITE_ROW: Int32 = 100
-comptime SQLITE_DONE: Int32 = 101
 comptime C_INT_MAX: Int = 2147483647
 
 def _checked_c_int(value: Int, message: String, code: Int = Int(SQLITE_RANGE)) raises -> c_int:
@@ -72,7 +84,11 @@ struct TableColumnMetadata(Copyable, Writable):
 
 @fieldwise_init
 struct SQLiteValue(Movable, Writable):
-    """An owned SQLite scalar value copied from or bound to a statement."""
+    """An owned SQLite scalar value copied from or bound to a statement.
+
+    ``kind`` is a column datatype (``SQLITE_INTEGER_TYPE`` ... ``SQLITE_NULL_TYPE``),
+    not a result code. Do not compare it with ``SQLITE_ERROR`` or ``SQLITE_BUSY``.
+    """
     var kind: Int
     var integer_value: Int
     var real_value: Float64
@@ -81,29 +97,29 @@ struct SQLiteValue(Movable, Writable):
 
     @staticmethod
     def null() -> Self:
-        return SQLiteValue(kind=Int(SQLITE_NULL), integer_value=0, real_value=0.0, text_value="", blob_value=List[UInt8]())
+        return SQLiteValue(kind=Int(SQLITE_NULL_TYPE), integer_value=0, real_value=0.0, text_value="", blob_value=List[UInt8]())
 
     @staticmethod
     def integer(value: Int) -> Self:
-        return SQLiteValue(kind=Int(SQLITE_INTEGER), integer_value=value, real_value=0.0, text_value="", blob_value=List[UInt8]())
+        return SQLiteValue(kind=Int(SQLITE_INTEGER_TYPE), integer_value=value, real_value=0.0, text_value="", blob_value=List[UInt8]())
 
     @staticmethod
     def real(value: Float64) -> Self:
-        return SQLiteValue(kind=Int(SQLITE_REAL), integer_value=0, real_value=value, text_value="", blob_value=List[UInt8]())
+        return SQLiteValue(kind=Int(SQLITE_REAL_TYPE), integer_value=0, real_value=value, text_value="", blob_value=List[UInt8]())
 
     @staticmethod
     def text(value: String) -> Self:
-        return SQLiteValue(kind=Int(SQLITE_TEXT), integer_value=0, real_value=0.0, text_value=value, blob_value=List[UInt8]())
+        return SQLiteValue(kind=Int(SQLITE_TEXT_TYPE), integer_value=0, real_value=0.0, text_value=value, blob_value=List[UInt8]())
 
     @staticmethod
     def blob(value: List[UInt8]) -> Self:
-        return SQLiteValue(kind=Int(SQLITE_BLOB), integer_value=0, real_value=0.0, text_value="", blob_value=value.copy())
+        return SQLiteValue(kind=Int(SQLITE_BLOB_TYPE), integer_value=0, real_value=0.0, text_value="", blob_value=value.copy())
 
     def copy(self) -> Self:
         return SQLiteValue(kind=self.kind, integer_value=self.integer_value, real_value=self.real_value, text_value=self.text_value, blob_value=self.blob_value.copy())
 
     def is_null(self) -> Bool:
-        return self.kind == Int(SQLITE_NULL)
+        return self.kind == Int(SQLITE_NULL_TYPE)
 struct Row(Movable):
     """An owned snapshot of the current statement row.
 
@@ -146,49 +162,49 @@ struct Row(Movable):
 
     def integer(self, index: Int) raises -> Int:
         var item = self.value(index)
-        if item.kind != Int(SQLITE_INTEGER):
+        if item.kind != Int(SQLITE_INTEGER_TYPE):
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not INTEGER")))
         return item.integer_value
 
     def real(self, index: Int) raises -> Float64:
         var item = self.value(index)
-        if item.kind != Int(SQLITE_REAL):
+        if item.kind != Int(SQLITE_REAL_TYPE):
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not REAL")))
         return item.real_value
 
     def text(self, index: Int) raises -> String:
         var item = self.value(index)
-        if item.kind != Int(SQLITE_TEXT):
+        if item.kind != Int(SQLITE_TEXT_TYPE):
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not TEXT")))
         return item.text_value
 
     def blob(self, index: Int) raises -> List[UInt8]:
         var item = self.value(index)
-        if item.kind != Int(SQLITE_BLOB):
+        if item.kind != Int(SQLITE_BLOB_TYPE):
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not BLOB")))
         return item.blob_value.copy()
 
     def integer_by_name(self, name: String) raises -> Int:
         var item = self.value_by_name(name)
-        if item.kind != Int(SQLITE_INTEGER):
+        if item.kind != Int(SQLITE_INTEGER_TYPE):
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not INTEGER")))
         return item.integer_value
 
     def real_by_name(self, name: String) raises -> Float64:
         var item = self.value_by_name(name)
-        if item.kind != Int(SQLITE_REAL):
+        if item.kind != Int(SQLITE_REAL_TYPE):
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not REAL")))
         return item.real_value
 
     def text_by_name(self, name: String) raises -> String:
         var item = self.value_by_name(name)
-        if item.kind != Int(SQLITE_TEXT):
+        if item.kind != Int(SQLITE_TEXT_TYPE):
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not TEXT")))
         return item.text_value
 
     def blob_by_name(self, name: String) raises -> List[UInt8]:
         var item = self.value_by_name(name)
-        if item.kind != Int(SQLITE_BLOB):
+        if item.kind != Int(SQLITE_BLOB_TYPE):
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: row value is not BLOB")))
         return item.blob_value.copy()
 
@@ -213,6 +229,12 @@ struct Savepoint(Movable):
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: savepoint is released")))
 @fieldwise_init
 struct SQLiteError(Copyable, Writable):
+    """A SQLite result-code failure.
+
+    ``code`` is a result code (``SQLITE_ERROR``, ``SQLITE_BUSY``, ...), not a
+    column datatype. Do not compare it with ``SQLITE_INTEGER_TYPE`` or
+    ``SQLITE_NULL_TYPE``.
+    """
     var code: Int
     var message: String
 
@@ -223,7 +245,12 @@ struct SQLiteError(Copyable, Writable):
         self.write_to(writer)
 
 def error_code(err: Error) -> Int:
-    """Parse the SQLite result code from a raised ``SQLiteError`` string."""
+    """Parse the SQLite result code from a raised ``SQLiteError`` string.
+
+    Compare the returned integer with result-code names such as ``SQLITE_BUSY``,
+    never with column datatypes such as ``SQLITE_INTEGER_TYPE`` or
+    ``SQLITE_NULL_TYPE``.
+    """
     var text = String(err)
     var prefix = "sqlite.fire: code="
     if not text.startswith(prefix):
@@ -343,10 +370,18 @@ struct Connection(Movable):
         return _string_from_cstr(self._library.get_function[CStr]("sf_errmsg")(self._db))
 
     def error_code(self) raises -> Int:
+        """Return sqlite3_errcode, a result code, not a column datatype.
+
+        Do not compare it with ``SQLITE_INTEGER_TYPE`` or ``SQLITE_NULL_TYPE``.
+        """
         self._ensure_open()
         return Int(self._library.get_function[c_int]("sf_errcode")(self._db))
 
     def extended_error_code(self) raises -> Int:
+        """Return sqlite3_extended_errcode, a result code, not a column datatype.
+
+        Do not compare it with ``SQLITE_INTEGER_TYPE`` or ``SQLITE_NULL_TYPE``.
+        """
         self._ensure_open()
         return Int(self._library.get_function[c_int]("sf_extended_errcode")(self._db))
 
@@ -531,15 +566,15 @@ struct Statement(Movable):
         if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind null")
     def bind_value(mut self, index: Int, value: SQLiteValue) raises:
         """Bind an owned scalar using SQLite's native type semantics."""
-        if value.kind == Int(SQLITE_NULL):
+        if value.kind == Int(SQLITE_NULL_TYPE):
             self.bind_null(index)
-        elif value.kind == Int(SQLITE_INTEGER):
+        elif value.kind == Int(SQLITE_INTEGER_TYPE):
             self.bind_int(index, value.integer_value)
-        elif value.kind == Int(SQLITE_REAL):
+        elif value.kind == Int(SQLITE_REAL_TYPE):
             self.bind_real(index, value.real_value)
-        elif value.kind == Int(SQLITE_TEXT):
+        elif value.kind == Int(SQLITE_TEXT_TYPE):
             self.bind_text(index, value.text_value)
-        elif value.kind == Int(SQLITE_BLOB):
+        elif value.kind == Int(SQLITE_BLOB_TYPE):
             self.bind_blob(index, value.blob_value.copy())
         else:
             raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: unknown SQLiteValue kind")))
@@ -550,11 +585,11 @@ struct Statement(Movable):
     def column_value(self, index: Int) raises -> SQLiteValue:
         """Copy one result column while retaining SQL NULL/empty distinctions."""
         var kind = self.column_type(index)
-        if kind == Int(SQLITE_NULL): return SQLiteValue.null()
-        if kind == Int(SQLITE_INTEGER): return SQLiteValue.integer(self.column_int(index))
-        if kind == Int(SQLITE_REAL): return SQLiteValue.real(self.column_real(index))
-        if kind == Int(SQLITE_TEXT): return SQLiteValue.text(self.column_text(index))
-        if kind == Int(SQLITE_BLOB): return SQLiteValue.blob(self.column_blob(index))
+        if kind == Int(SQLITE_NULL_TYPE): return SQLiteValue.null()
+        if kind == Int(SQLITE_INTEGER_TYPE): return SQLiteValue.integer(self.column_int(index))
+        if kind == Int(SQLITE_REAL_TYPE): return SQLiteValue.real(self.column_real(index))
+        if kind == Int(SQLITE_TEXT_TYPE): return SQLiteValue.text(self.column_text(index))
+        if kind == Int(SQLITE_BLOB_TYPE): return SQLiteValue.blob(self.column_blob(index))
         raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: unknown SQLite column type")))
 
     def bind_int(mut self, index: Int, value: Int) raises:
@@ -668,6 +703,10 @@ struct Statement(Movable):
         if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to clear bindings")
 
     def step_code(mut self) raises -> Int:
+        """Return sqlite3_step, a result code, not a column datatype.
+
+        Do not compare it with ``SQLITE_INTEGER_TYPE`` or ``SQLITE_NULL_TYPE``.
+        """
         self._ensure_open()
         return Int(self._library.get_function[c_int]("sf_step")(self._stmt))
 
@@ -690,9 +729,13 @@ struct Statement(Movable):
         return _string_from_cstr(self._library.get_function[CStr]("sf_column_name")(self._stmt, _checked_c_int(index, "sqlite.fire: column index out of range")))
 
     def column_null(self, index: Int) raises -> Bool:
-        return self.column_type(index) == Int(SQLITE_NULL)
+        return self.column_type(index) == Int(SQLITE_NULL_TYPE)
 
     def column_type(self, index: Int) raises -> Int:
+        """Return sqlite3_column_type, a column datatype (``SQLITE_INTEGER_TYPE`` ... ``SQLITE_NULL_TYPE``), not a result code.
+
+        Do not compare it with ``SQLITE_ERROR`` or ``SQLITE_BUSY``.
+        """
         self._check_column(index)
         return Int(self._library.get_function[c_int]("sf_column_type")(self._stmt, _checked_c_int(index, "sqlite.fire: column index out of range")))
 

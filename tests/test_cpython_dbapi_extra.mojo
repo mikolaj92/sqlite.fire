@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_CANTOPEN, SQLITE_ERROR, SQLITE_INTEGER, SQLITE_MISUSE, error_code
+from sqlite_fire.sqlite import Connection, SQLITE_CANTOPEN, SQLITE_ERROR, SQLITE_MISUSE, error_code
 
 def main() raises:
     # CPython sqlite3 treats commit()/rollback() as harmless in autocommit mode.

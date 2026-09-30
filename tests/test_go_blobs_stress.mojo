@@ -1,5 +1,5 @@
 from std.collections import List
-from sqlite_fire.sqlite import Connection, SQLITE_BLOB, SQLITE_NULL
+from sqlite_fire.sqlite import Connection, SQLITE_BLOB_TYPE, SQLITE_NULL_TYPE
 
 def main() raises:
     var db = Connection("file:/tmp/sqlite_fire_go_blobs_stress.db?mode=rwc\0")
@@ -43,20 +43,20 @@ def main() raises:
     var rows = db.query("SELECT id, payload FROM go_blob_stress ORDER BY id\0")
     assert rows.step()
     assert rows.column_int(0) == 1
-    assert rows.column_type(1) == Int(SQLITE_BLOB)
+    assert rows.column_type(1) == Int(SQLITE_BLOB_TYPE)
     assert len(rows.column_blob(1)) == 0
 
     assert rows.step()
     assert rows.column_int(0) == 2
     var one_read = rows.column_blob(1)
-    assert rows.column_type(1) == Int(SQLITE_BLOB)
+    assert rows.column_type(1) == Int(SQLITE_BLOB_TYPE)
     assert len(one_read) == 1
     assert one_read[0] == 0
 
     assert rows.step()
     assert rows.column_int(0) == 3
     var medium_read = rows.column_blob(1)
-    assert rows.column_type(1) == Int(SQLITE_BLOB)
+    assert rows.column_type(1) == Int(SQLITE_BLOB_TYPE)
     assert len(medium_read) == 257
     assert medium_read[0] == 0
     assert medium_read[1] == 1
@@ -65,7 +65,7 @@ def main() raises:
     assert rows.step()
     assert rows.column_int(0) == 4
     var large_read = rows.column_blob(1)
-    assert rows.column_type(1) == Int(SQLITE_BLOB)
+    assert rows.column_type(1) == Int(SQLITE_BLOB_TYPE)
     assert len(large_read) == 65536
     assert large_read[0] == 3
     assert large_read[1] == 20
@@ -73,7 +73,7 @@ def main() raises:
 
     assert rows.step()
     assert rows.column_int(0) == 5
-    assert rows.column_type(1) == Int(SQLITE_NULL)
+    assert rows.column_type(1) == Int(SQLITE_NULL_TYPE)
     assert len(rows.column_blob(1)) == 0
     assert not rows.step()
     rows.close()

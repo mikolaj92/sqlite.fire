@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_BUSY, SQLITE_READONLY, error_code
+from sqlite_fire.sqlite import Connection, SQLITE_BUSY, SQLITE_INTEGER_TYPE, SQLITE_NULL_TYPE, SQLITE_READONLY, error_code
 
 def main() raises:
     var path = "file:/tmp/sqlite_fire_go_uri_locking.db?mode=rwc\0"
@@ -39,13 +39,37 @@ def main() raises:
     read_write.begin_immediate()
     var contender = Connection("file:/tmp/sqlite_fire_go_uri_locking.db?mode=rw\0")
     contender.busy_timeout(25)
+    var saw_busy = False
     try:
         contender.execute("INSERT INTO go_uri_locking(value) VALUES ('blocked')\0")
-        assert False
     except e:
+        # SQLITE_BUSY is a result code (5). Do not compare against SQLITE_NULL_TYPE.
         assert error_code(e) == Int(SQLITE_BUSY)
+        assert contender.error_code() == Int(SQLITE_BUSY)
+        assert contender.extended_error_code() == Int(SQLITE_BUSY)
+        saw_busy = True
+    assert saw_busy
     read_write.rollback()
+    # BUSY must have rejected the write, not merely produced a matching integer.
+    var after_busy = contender.query("SELECT count(*) FROM go_uri_locking\0")
+    assert after_busy.step()
+    assert after_busy.column_int(0) == 2
+    assert not after_busy.step()
+    after_busy.close()
     contender.execute("INSERT INTO go_uri_locking(value) VALUES ('after-lock')\0")
+    # Recovery clears BUSY; a NULL column is still a datatype, not an error.
+    var null_row = contender.query("SELECT NULL, 1\0")
+    assert null_row.step()
+    assert null_row.column_type(0) == Int(SQLITE_NULL_TYPE)
+    assert null_row.column_value(0).kind == Int(SQLITE_NULL_TYPE)
+    assert null_row.column_null(0)
+    assert null_row.column_value(0).is_null()
+    assert not null_row.column_null(1)
+    assert null_row.column_type(1) == Int(SQLITE_INTEGER_TYPE)
+    assert null_row.column_int(1) == 1
+    assert contender.error_code() == 0
+    assert contender.extended_error_code() == 0
+    null_row.close()
     contender.close()
     read_write.close()
 
