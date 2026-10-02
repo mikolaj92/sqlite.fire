@@ -95,7 +95,7 @@ def test_public_modules_do_not_alias_bare_datatype_names():
 def _code_lines(text: str):
     # Mask literals before comments: a # inside SQL is not a Mojo comment.
     literals = re.compile(r'''"""[\s\S]*?"""|\x27\x27\x27[\s\S]*?\x27\x27\x27|"(?:\\.|[^"\\])*"|\x27(?:\\.|[^\x27\\])*\x27|\#[^\n]*''')
-    text = literals.sub(lambda m: " " + "\n" * m.group().count("\n"), text)
+    text = literals.sub(lambda m: (" " if m.group().startswith("#") else '""') + "\n" * m.group().count("\n"), text)
     yield from text.splitlines()
 
 
@@ -165,7 +165,9 @@ def _crosses_namespaces(text: str) -> bool:
         # These direct expressions share Python syntax; this is a bounded
         # source contract, not a Mojo parser or a dataflow/type checker.
         stmt = re.sub(r"^(?:var|comptime)\s+", "", stmt)
-        stmt = re.sub(r"^(?:if|elif|while)\s+", "", stmt).removesuffix(":")
+        stmt = re.sub(r"^elif\s+", "if ", stmt)
+        if stmt.endswith(":"):
+            stmt += " pass"
         try:
             tree = ast.parse(stmt)
         except SyntaxError:
@@ -219,6 +221,8 @@ var sql = "SELECT 'SQLITE_NULL', '# SQLITE_INTEGER'"
         "var kind = Int(SQLITE_BUSY)",
         "db.code = Int(SQLITE_INTEGER_TYPE)",
         "assert error_code(e) == Int(\nSQLITE_NULL_TYPE)",
+        'assert error_code(e) == Int(SQLITE_NULL_TYPE), "unexpected code"',
+        "if error_code(e) == Int(SQLITE_NULL_TYPE): return",
     ):
         assert _crosses_namespaces(invalid), invalid
 
