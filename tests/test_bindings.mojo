@@ -1,5 +1,5 @@
 from std.collections import List
-from sqlite_fire.sqlite import Connection, SQLITE_BLOB, SQLITE_INTEGER, SQLITE_NULL, SQLITE_REAL, SQLITE_TEXT
+from sqlite_fire.sqlite import Connection, SQLITE_BLOB_TYPE, SQLITE_INTEGER_TYPE, SQLITE_NULL_TYPE, SQLITE_REAL_TYPE, SQLITE_TEXT_TYPE
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -24,13 +24,13 @@ def main() raises:
     scalars.bind_text(3, "hello")
     scalars.bind_null(4)
     assert scalars.step()
-    assert scalars.column_type(0) == Int(SQLITE_INTEGER)
+    assert scalars.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert scalars.column_int(0) == 42
-    assert scalars.column_type(1) == Int(SQLITE_REAL)
+    assert scalars.column_type(1) == Int(SQLITE_REAL_TYPE)
     assert scalars.column_real(1) == 2.5
-    assert scalars.column_type(2) == Int(SQLITE_TEXT)
+    assert scalars.column_type(2) == Int(SQLITE_TEXT_TYPE)
     assert scalars.column_text(2) == "hello"
-    assert scalars.column_type(3) == Int(SQLITE_NULL)
+    assert scalars.column_type(3) == Int(SQLITE_NULL_TYPE)
     assert scalars.column_null(3)
     assert not scalars.step()
     scalars.close()
@@ -64,7 +64,7 @@ def main() raises:
     reusable.clear_bindings()
     reusable.reset()
     assert reusable.step()
-    assert reusable.column_type(0) == Int(SQLITE_NULL)
+    assert reusable.column_type(0) == Int(SQLITE_NULL_TYPE)
     assert not reusable.step()
     reusable.close()
 
@@ -84,7 +84,7 @@ def main() raises:
     var blob_stmt = db.query("SELECT ?\0")
     blob_stmt.bind_blob(1, blob)
     assert blob_stmt.step()
-    assert blob_stmt.column_type(0) == Int(SQLITE_BLOB)
+    assert blob_stmt.column_type(0) == Int(SQLITE_BLOB_TYPE)
     var round_trip = blob_stmt.column_blob(0)
     assert len(round_trip) == 3
     assert round_trip[0] == 0

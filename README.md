@@ -73,6 +73,13 @@ wartości do SQL nie jest obsługiwana jako bezpieczny mechanizm.
 
 `OpenOptions` domyślnie używa `SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI`.
 `SQLiteValue` zachowuje rozróżnienie między SQL `NULL`, pustym tekstem i pustym BLOB-em.
+Kody wyniku (`SQLITE_ERROR`, `SQLITE_BUSY`, …) i kody typów kolumn (`SQLITE_INTEGER_TYPE`,
+`SQLITE_NULL_TYPE`, …) to osobne rodziny nazw. SQLite w C używa tych samych liczb (`1` i `5`)
+w dwóch rodzinach makr; `error_code()` porównuj tylko z kodami wyniku, a `column_type()` / `kind`
+tylko z `SQLITE_*_TYPE`. Nie porównuj ich krzyżowo. To rozdział nazw, nie statycznych typów:
+stałe nadal mają typ `Int32`. Dotychczasowe importy typów kolumn (`SQLITE_INTEGER`,
+`SQLITE_REAL`, `SQLITE_TEXT`, `SQLITE_BLOB`, `SQLITE_NULL`) należy zmienić na nazwy
+z sufiksem `_TYPE`; nazwy kodów wyniku i ABI C pozostają bez zmian.
 `serialize()` zwraca skopiowane dane Mojo; flaga `SQLITE_SERIALIZE_NOCOPY` jest odrzucana.
 `PassthroughVFS` należy zamknąć dopiero po zamknięciu wszystkich baz otwartych z jego nazwą.
 
@@ -104,7 +111,9 @@ i utworzonych przez niego zasobów.
 - authorizer, progress, trace, update, commit, rollback, WAL i busy hooks;
 - rejestrację i wyrejestrowanie passthrough VFS;
 - `sf_enable_load_extension` i `sf_load_extension` na platformach z dynamicznym loaderem;
-- typed SQLite result codes bez zastępowania ich ogólnym błędem.
+- oryginalne liczbowe kody wyniku SQLite bez zastępowania ich ogólnym błędem; kody wyniku
+  (`sf_errcode`, `sf_step`) nie są kodami typów kolumn (`sf_column_type` /
+  `sqlite3_column_type`).
 
 Callbacki natywne otrzymują synchroniczne wskaźniki SQLite i są przeznaczone dla kodu C.
 `userdata` pozostaje własnością wywołującego i musi żyć przez cały czas rejestracji;
@@ -185,14 +194,15 @@ Szybki przykład produktu:
 pixi run smoke
 ```
 
-Jedno kanoniczne zadanie `test` uruchamia pełną suite Mojo oraz natywne testy strict:
+Jedno kanoniczne zadanie `test` uruchamia kontrakt nazw (`SQLITE_BUSY` vs
+`SQLITE_NULL_TYPE`), pełną suite Mojo oraz natywne testy strict:
 
 ```sh
 pixi run test
 ```
 
-`[tool.lokay] test` wskazuje to samo zadanie. Opcjonalne `uv run pytest` sprawdza
-wyłącznie pin toolchainu i nie zastępuje pełnej suite.
+`[tool.lokay] test` wskazuje to samo zadanie. Opcjonalne `uv run pytest` powtarza
+pin toolchainu i kontrakt nazw i nie zastępuje pełnej suite Mojo.
 
 Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
 ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu. Weryfikacja

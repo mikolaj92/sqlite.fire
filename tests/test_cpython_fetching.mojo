@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_INTEGER, SQLITE_NULL, SQLITE_RANGE, SQLITE_ROW, SQLITE_DONE, error_code
+from sqlite_fire.sqlite import Connection, SQLITE_INTEGER_TYPE, SQLITE_NULL_TYPE, SQLITE_RANGE, SQLITE_ROW, SQLITE_DONE, error_code
 
 def main() raises:
     var db = Connection(":memory:")
@@ -15,7 +15,7 @@ def main() raises:
 
     # sqlite3_step returns ROW for each record and DONE at exhaustion.
     assert rows.step_code() == Int(SQLITE_ROW)
-    assert rows.column_type(0) == Int(SQLITE_INTEGER)
+    assert rows.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert rows.column_int(0) == 1
     assert rows.column_text(1) == "Ada"
     assert rows.column_int(2) == 10
@@ -48,7 +48,7 @@ def main() raises:
     # NULL is observable through both its type and text conversion contract.
     var nullable = db.query("SELECT NULL, name FROM people WHERE id = 1")
     assert nullable.step()
-    assert nullable.column_type(0) == Int(SQLITE_NULL)
+    assert nullable.column_type(0) == Int(SQLITE_NULL_TYPE)
     assert nullable.column_text(0) == ""
     assert nullable.column_text(1) == "Ada"
     assert not nullable.step()

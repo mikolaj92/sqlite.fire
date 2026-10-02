@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_INTEGER, SQLITE_NULL, SQLITE_TEXT
+from sqlite_fire.sqlite import Connection, SQLITE_INTEGER_TYPE, SQLITE_NULL_TYPE, SQLITE_TEXT_TYPE
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -9,9 +9,9 @@ def main() raises:
     assert rows.column_count() == 3
     assert rows.column_name(0) == "id"
     assert rows.step()
-    assert rows.column_type(0) == Int(SQLITE_INTEGER)
-    assert rows.column_type(1) == Int(SQLITE_TEXT)
-    assert rows.column_type(2) == Int(SQLITE_NULL)
+    assert rows.column_type(0) == Int(SQLITE_INTEGER_TYPE)
+    assert rows.column_type(1) == Int(SQLITE_TEXT_TYPE)
+    assert rows.column_type(2) == Int(SQLITE_NULL_TYPE)
     assert rows.column_int(0) == 7
     assert rows.column_text(1) == "ok"
     assert rows.column_text(2) == ""

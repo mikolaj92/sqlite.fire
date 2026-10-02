@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_INTEGER, SQLITE_MISUSE, SQLITE_NULL, SQLITE_RANGE, error_code
+from sqlite_fire.sqlite import Connection, SQLITE_INTEGER_TYPE, SQLITE_MISUSE, SQLITE_NULL_TYPE, SQLITE_RANGE, error_code
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -40,10 +40,10 @@ def main() raises:
     assert repeated.parameter_name(1) == ":same"
     repeated.bind_int(1, 7)
     assert repeated.step()
-    assert repeated.column_type(0) == Int(SQLITE_INTEGER)
+    assert repeated.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert repeated.column_int(0) == 7
     assert repeated.column_int(1) == 7
-    assert repeated.column_type(2) == Int(SQLITE_NULL)
+    assert repeated.column_type(2) == Int(SQLITE_NULL_TYPE)
     assert not repeated.step()
     repeated.close()
 

@@ -1,5 +1,5 @@
 from std.collections import List
-from sqlite_fire.sqlite import Connection, SQLITE_BLOB, SQLITE_INTEGER, SQLITE_NULL, SQLITE_REAL, SQLITE_TEXT
+from sqlite_fire.sqlite import Connection, SQLITE_BLOB_TYPE, SQLITE_INTEGER_TYPE, SQLITE_NULL_TYPE, SQLITE_REAL_TYPE, SQLITE_TEXT_TYPE
 
 def main() raises:
     var db = Connection(":memory:\0")
@@ -27,15 +27,15 @@ def main() raises:
     assert rows.column_name(4) == "b"
     assert rows.step()
 
-    assert rows.column_type(0) == Int(SQLITE_INTEGER)
+    assert rows.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert rows.column_int(0) == -922337203685477580
-    assert rows.column_type(1) == Int(SQLITE_REAL)
+    assert rows.column_type(1) == Int(SQLITE_REAL_TYPE)
     assert rows.column_real(1) == 3.125
-    assert rows.column_type(2) == Int(SQLITE_TEXT)
+    assert rows.column_type(2) == Int(SQLITE_TEXT_TYPE)
     assert rows.column_text(2) == "utf8-zażółć-日本語"
-    assert rows.column_type(3) == Int(SQLITE_TEXT)
+    assert rows.column_type(3) == Int(SQLITE_TEXT_TYPE)
     assert rows.column_text(3) == "left"
-    assert rows.column_type(4) == Int(SQLITE_BLOB)
+    assert rows.column_type(4) == Int(SQLITE_BLOB_TYPE)
     var read_blob = rows.column_blob(4)
     assert len(read_blob) == 3
     assert read_blob[0] == 0
@@ -53,14 +53,14 @@ def main() raises:
     var nulls = db.query("SELECT NULL, '', CAST(NULL AS BLOB), x'00FF'\0")
     assert nulls.column_count() == 4
     assert nulls.step()
-    assert nulls.column_type(0) == Int(SQLITE_NULL)
+    assert nulls.column_type(0) == Int(SQLITE_NULL_TYPE)
     assert nulls.column_null(0)
     assert nulls.column_text(0) == ""
-    assert nulls.column_type(1) == Int(SQLITE_TEXT)
+    assert nulls.column_type(1) == Int(SQLITE_TEXT_TYPE)
     assert nulls.column_text(1) == ""
-    assert nulls.column_type(2) == Int(SQLITE_NULL)
+    assert nulls.column_type(2) == Int(SQLITE_NULL_TYPE)
     assert len(nulls.column_blob(2)) == 0
-    assert nulls.column_type(3) == Int(SQLITE_BLOB)
+    assert nulls.column_type(3) == Int(SQLITE_BLOB_TYPE)
     var literal_blob = nulls.column_blob(3)
     assert len(literal_blob) == 2
     assert literal_blob[0] == 0

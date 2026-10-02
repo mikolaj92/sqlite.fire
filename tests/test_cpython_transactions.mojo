@@ -1,4 +1,4 @@
-from sqlite_fire.sqlite import Connection, SQLITE_ERROR, SQLITE_INTEGER, error_code
+from sqlite_fire.sqlite import Connection, SQLITE_ERROR, SQLITE_INTEGER_TYPE, error_code
 
 def main() raises:
     var db = Connection(":memory:")
@@ -26,7 +26,7 @@ def main() raises:
     assert db.changes() == 1
     var committed = db.query("SELECT count(*) FROM ledger WHERE note = 'committed'")
     assert committed.step()
-    assert committed.column_type(0) == Int(SQLITE_INTEGER)
+    assert committed.column_type(0) == Int(SQLITE_INTEGER_TYPE)
     assert committed.column_int(0) == 1
     assert not committed.step()
     committed.close()
