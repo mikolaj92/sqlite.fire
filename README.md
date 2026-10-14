@@ -206,8 +206,7 @@ pixi run test
 pin toolchainu i kontrakt nazw i nie zastępuje pełnej suite Mojo.
 
 Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
-ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu. Weryfikacja
-jest lokalna (`pixi run test`); remote CI nie istnieje.
+ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu.
 
 Ręczne testy natywnego ABI:
 
