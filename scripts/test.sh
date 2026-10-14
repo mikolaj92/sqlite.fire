@@ -8,9 +8,25 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
+# Report the process boundary, not just the last test that started.
+stage=setup
+finish() {
+    status=$?
+    cleanup_status=0
+    cleanup || cleanup_status=$?
+    if [ "$status" -eq 0 ]; then status=$cleanup_status; fi
+    printf 'sqlite-fire runner: stage=%s exit=%s cleanup_exit=%s\n' \
+        "$stage" "$status" "$cleanup_status" >&2
+    exit "$status"
+}
+trap finish EXIT
+
 cd "$ROOT"
+stage=constant_namespaces
 python3 tests/test_constant_namespaces.py
+stage=native_strict
 make -C native strict-test
+stage=native_build
 make -B -C native all
 
 case "$(uname -s)" in
@@ -30,6 +46,9 @@ for test in tests/*.mojo; do
     name=$(basename "$test" .mojo)
     output="$TMPDIR/$name"
     printf 'Mojo test: %s\n' "$name"
+    stage="build:$name"
     mojo build -I src "$test" -o "$output"
+    stage="run:$name"
     "$output"
 done
+stage=complete
