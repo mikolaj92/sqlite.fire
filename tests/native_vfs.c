@@ -18,6 +18,12 @@ int main(void) {
     assert(sf_exec(db, "INSERT INTO t VALUES (7)") == SQLITE_OK);
     assert(sf_vfs_unregister(vfs) == SQLITE_MISUSE);
     assert(sf_close(db) == SQLITE_OK);
+    sf_vfs *child = NULL;
+    assert(sf_vfs_register_passthrough("sqlite_fire_child_vfs", "sqlite_fire_test_vfs", 0, &child) == SQLITE_OK);
+    assert(child != NULL);
+    assert(sf_vfs_unregister(vfs) == SQLITE_MISUSE);
+    assert(sf_vfs_unregister(child) == SQLITE_OK);
+    child = NULL; /* Successful unregister invalidates every alias. */
     assert(sf_vfs_unregister(vfs) == SQLITE_OK);
     vfs = NULL; /* Successful unregister invalidates every alias. */
     assert(sf_vfs_register_passthrough("", "unix", 0, &vfs) == SQLITE_MISUSE);

@@ -6,10 +6,7 @@ TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/sqlite-fire-tests.XXXXXX")
 cleanup() {
     rm -rf "$TMPDIR"
 }
-trap cleanup EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
+trap cleanup EXIT HUP INT TERM
 
 cd "$ROOT"
 python3 tests/test_constant_namespaces.py
