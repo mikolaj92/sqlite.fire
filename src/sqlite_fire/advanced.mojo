@@ -52,7 +52,12 @@ def _check(result: c_int, message: String) raises:
     if result != SQLITE_OK:
         raise Error(String(_error(Int(result), message)))
 struct PassthroughVFS(Movable):
-    """Registered passthrough VFS; close after dependent databases close."""
+    """Owns a passthrough VFS; close after dependent databases close.
+
+    close() is idempotent here: successful C unregister frees the VFS,
+    and _closed prevents further calls with that invalid pointer. Failed
+    unregister keeps ownership and allows close() to be retried.
+    """
     var _library: OwnedDLHandle
     var _vfs: VfsPtr
     var _closed: Bool
@@ -83,6 +88,7 @@ struct PassthroughVFS(Movable):
             pass
 
     def close(mut self) raises:
+        """Unregister once; on error keep the VFS open for a later retry."""
         if self._closed: return
         var result = self._library.get_function[c_int]("sf_vfs_unregister")(self._vfs)
         if result == SQLITE_OK: self._closed = True

@@ -26,7 +26,6 @@ struct sf_vfs {
     sqlite3_vfs vfs;
     sqlite3_vfs *base;
     char *name;
-    int registered;
     unsigned active;
     unsigned inflight;
     pthread_mutex_t mutex;
@@ -150,14 +149,12 @@ int sf_vfs_register_passthrough(const char *name, const char *base_name, int mak
     }
     int result = sqlite3_vfs_register(&wrapper->vfs, make_default != 0);
     if (result != SQLITE_OK) { free(wrapper->name); pthread_mutex_destroy(&wrapper->mutex); free(wrapper); return result; }
-    wrapper->registered = 1;
     *out_vfs = wrapper;
     return SQLITE_OK;
 }
 
 int sf_vfs_unregister(sf_vfs *wrapper) {
     if (wrapper == NULL) return SQLITE_MISUSE;
-    if (!wrapper->registered) return SQLITE_OK;
     (void)pthread_mutex_lock(&wrapper->mutex);
     unsigned active = wrapper->active;
     unsigned inflight = wrapper->inflight;
@@ -165,7 +162,6 @@ int sf_vfs_unregister(sf_vfs *wrapper) {
     if (active != 0 || inflight != 0) return SQLITE_MISUSE;
     int result = sqlite3_vfs_unregister(&wrapper->vfs);
     if (result == SQLITE_OK) {
-        wrapper->registered = 0;
         free(wrapper->name);
         pthread_mutex_destroy(&wrapper->mutex);
         free(wrapper);
