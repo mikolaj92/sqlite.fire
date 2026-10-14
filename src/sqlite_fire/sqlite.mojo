@@ -563,7 +563,7 @@ struct Statement(Movable):
     def bind_null(mut self, index: Int) raises:
         self._ensure_open()
         var result = self._library.get_function[c_int]("sf_bind_null")(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"))
-        if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind null")
+        if result != SQLITE_OK: raise Error(String(SQLiteError(code=Int(result), message="sqlite.fire: failed to bind null")))
     def bind_value(mut self, index: Int, value: SQLiteValue) raises:
         """Bind an owned scalar using SQLite's native type semantics."""
         if value.kind == Int(SQLITE_NULL_TYPE):
@@ -595,26 +595,26 @@ struct Statement(Movable):
     def bind_int(mut self, index: Int, value: Int) raises:
         self._ensure_open()
         var result = self._library.get_function[c_int]("sf_bind_int64")(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"), c_long_long(value))
-        if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind integer")
+        if result != SQLITE_OK: raise Error(String(SQLiteError(code=Int(result), message="sqlite.fire: failed to bind integer")))
 
     def bind_real(mut self, index: Int, value: Float64) raises:
         self._ensure_open()
         var result = self._library.get_function[c_int]("sf_bind_double")(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"), c_double(value))
-        if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind real")
+        if result != SQLITE_OK: raise Error(String(SQLiteError(code=Int(result), message="sqlite.fire: failed to bind real")))
 
     def bind_text(mut self, index: Int, value: String) raises:
         self._ensure_open()
         var text_value = value
         var text_ptr = text_value.as_bytes().unsafe_ptr()
         var result = self._library.get_function[c_int]("sf_bind_text")(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"), CStr(unsafe_from_address=Int(text_ptr)), _checked_c_int(text_value.byte_length(), "sqlite.fire: text length out of range"))
-        if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind text")
+        if result != SQLITE_OK: raise Error(String(SQLiteError(code=Int(result), message="sqlite.fire: failed to bind text")))
 
     def bind_blob(mut self, index: Int, value: List[UInt8]) raises:
         self._ensure_open()
         var length = len(value)
         var pointer = value.unsafe_ptr()
         var result = self._library.get_function[c_int]("sf_bind_blob")(self._stmt, _checked_c_int(index, "sqlite.fire: parameter index out of range"), BlobPtr(unsafe_from_address=Int(pointer)), _checked_c_int(length, "sqlite.fire: blob length out of range"))
-        if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to bind blob")
+        if result != SQLITE_OK: raise Error(String(SQLiteError(code=Int(result), message="sqlite.fire: failed to bind blob")))
 
     def parameter_count(self) raises -> Int:
         self._ensure_open()
@@ -641,13 +641,13 @@ struct Statement(Movable):
     def readonly(self) raises -> Bool:
         self._ensure_open()
         var result = self._library.get_function[c_int]("sf_stmt_readonly")(self._stmt)
-        if result < 0: raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: failed to inspect statement")
+        if result < 0: raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: failed to inspect statement")))
         return result != 0
 
     def data_count(self) raises -> Int:
         self._ensure_open()
         var result = self._library.get_function[c_int]("sf_data_count")(self._stmt)
-        if result < 0: raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: failed to inspect statement")
+        if result < 0: raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: failed to inspect statement")))
         return Int(result)
 
     def _metadata(self, index: Int, symbol: String) raises -> String:
@@ -695,12 +695,12 @@ struct Statement(Movable):
     def reset(mut self) raises:
         self._ensure_open()
         var result = self._library.get_function[c_int]("sf_reset")(self._stmt)
-        if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to reset statement")
+        if result != SQLITE_OK: raise Error(String(SQLiteError(code=Int(result), message="sqlite.fire: failed to reset statement")))
 
     def clear_bindings(mut self) raises:
         self._ensure_open()
         var result = self._library.get_function[c_int]("sf_clear_bindings")(self._stmt)
-        if result != SQLITE_OK: raise SQLiteError(code=Int(result), message="sqlite.fire: failed to clear bindings")
+        if result != SQLITE_OK: raise Error(String(SQLiteError(code=Int(result), message="sqlite.fire: failed to clear bindings")))
 
     def step_code(mut self) raises -> Int:
         """Return sqlite3_step, a result code, not a column datatype.
@@ -758,10 +758,10 @@ struct Statement(Movable):
         if self.column_null(index): return result^
         var index_c = _checked_c_int(index, "sqlite.fire: column index out of range")
         var length = Int(self._library.get_function[c_int]("sf_column_bytes")(self._stmt, index_c))
-        if length < 0: raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: invalid blob length")
+        if length < 0: raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: invalid blob length")))
         if length == 0: return result^
         var pointer = self._library.get_function[BlobPtr]("sf_column_blob")(self._stmt, index_c)
-        if Int(pointer) == 0: raise SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: null blob pointer")
+        if Int(pointer) == 0: raise Error(String(SQLiteError(code=Int(SQLITE_MISUSE), message="sqlite.fire: null blob pointer")))
         var i = 0
         while i < length:
             result.append(pointer.unsafe_offset(i).unsafe_load())
