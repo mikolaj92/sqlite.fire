@@ -1,8 +1,0 @@
-SHA: fa64248810da7384eea3c4e1772627f988a11198
-/Users/mini-m4-0/Developer/sqlite.fire/main-wt-21
-Darwin mini-m4-0.localdomain 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:02:57 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T8132 arm64
-uv 0.11.20 (9252ba6b5 2026-06-10 aarch64-apple-darwin)
-pixi 0.81.0
-Wed Oct 14 12:20:24 UTC 2026
-command: pixi run test
-pixi-test exit=0 duration=13s
