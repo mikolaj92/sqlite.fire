@@ -138,17 +138,8 @@ incremental BLOB-a po zamknięciu właściciela. Jest to obserwowane zachowanie 
 nie ogólna gwarancja wrappera — zalecane jest zamykanie zasobów zależnych przed właścicielem.
 Backup musi zachować oba właścicielskie połączenia otwarte aż do `finish()`.
 
-`close()`/`finish()` wrapperów Mojo są idempotentne, także `PassthroughVFS.close()`.
-Operacja na zamkniętym wrapperze zgłasza `SQLiteError` z kodem `SQLITE_MISUSE`.
-
-C ABI ma inny kontrakt: udany `sf_vfs_unregister` zwalnia wrapper VFS jednorazowo
-i unieważnia wskaźnik oraz wszystkie jego aliasy. Nie wolno ponownie używać tego
-wskaźnika, także do wyrejestrowania. Błąd zachowuje wrapper i pozwala ponowić operację.
-Odmowa przy aktywnej bazie wymaga zamknięcia bazy przed ponowieniem.
-Jeśli inny wrapper passthrough używa tego VFS jako bazy, najpierw wyrejestruj zależny wrapper.
-Zewnętrzny bazowy VFS musi pozostać zarejestrowany i żywy przez cały czas używania wrappera.
-Synchronizuj rejestrację i wyrejestrowanie z otwieraniem baz i innymi operacjami na VFS.
-Wrapper Mojo zapamiętuje udane zamknięcie i nie wywołuje ponownie C ABI.
+`close()`/`finish()` są idempotentne. Operacja na zamkniętym wrapperze zgłasza
+`SQLiteError` z kodem `SQLITE_MISUSE`.
 
 ## Ograniczenia
 
