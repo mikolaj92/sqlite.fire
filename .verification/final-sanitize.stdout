@@ -1,0 +1,4 @@
+cc -O2 -fPIC -I/usr/include -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -I. -o .native-tests/native_callbacks_sanitize ../tests/native_callbacks.c sqlite_fire.c -lsqlite3 
+cc -O2 -fPIC -I/usr/include -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -I. -o .native-tests/native_vfs_sanitize ../tests/native_vfs.c sqlite_fire.c -lsqlite3 
+native callback tests passed
+native VFS tests passed

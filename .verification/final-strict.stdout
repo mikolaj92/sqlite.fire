@@ -1,0 +1,4 @@
+cc -O2 -fPIC -I/usr/include -std=c11 -Wall -Wextra -Werror -I. -o .native-tests/native_callbacks ../tests/native_callbacks.c sqlite_fire.c -lsqlite3 
+cc -O2 -fPIC -I/usr/include -std=c11 -Wall -Wextra -Werror -I. -o .native-tests/native_vfs ../tests/native_vfs.c sqlite_fire.c -lsqlite3 
+native callback tests passed
+native VFS tests passed

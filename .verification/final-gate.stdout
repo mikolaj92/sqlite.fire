@@ -1,0 +1,31 @@
+native callback tests passed
+native VFS tests passed
+cc -O2 -fPIC -I/usr/include -dynamiclib -o libsqlite_fire.dylib sqlite_fire.c -lsqlite3 
+Mojo test: test_advanced
+Mojo test: test_bindings
+Mojo test: test_concurrency
+Mojo test: test_contracts
+Mojo test: test_cpython_conflicts
+Mojo test: test_cpython_dbapi_extra
+Mojo test: test_cpython_fetching
+Mojo test: test_cpython_transactions
+Mojo test: test_diagnostics
+Mojo test: test_go_blobs_stress
+Mojo test: test_go_crud
+Mojo test: test_go_empty
+Mojo test: test_go_fk
+Mojo test: test_go_repeated_query
+Mojo test: test_go_scalars
+Mojo test: test_go_triggers
+Mojo test: test_go_uri_locking
+Mojo test: test_resource_lifecycle
+Mojo test: test_rusqlite_binding_errors
+Mojo test: test_rusqlite_errors_schema
+Mojo test: test_rusqlite_lifecycle
+Mojo test: test_rusqlite_transactions_extra
+Mojo test: test_sqlite
+Mojo test: test_stress
+Mojo test: test_type_and_result_namespaces
+Mojo test: test_types
+Mojo test: test_uri
+Mojo test: test_vfs
