@@ -19,7 +19,7 @@ int main(void) {
     assert(sf_vfs_unregister(vfs) == SQLITE_MISUSE);
     assert(sf_close(db) == SQLITE_OK);
     assert(sf_vfs_unregister(vfs) == SQLITE_OK);
-    assert(sf_vfs_unregister(vfs) == SQLITE_OK);
+    vfs = NULL; /* Successful unregister invalidates every alias. */
     assert(sf_vfs_register_passthrough("", "unix", 0, &vfs) == SQLITE_MISUSE);
     assert(sf_vfs_register_passthrough("sqlite_fire_missing_vfs", "missing", 0, &vfs) == SQLITE_NOTFOUND);
     remove(path);

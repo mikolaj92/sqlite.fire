@@ -114,6 +114,12 @@ int sf_open_options(const char *filename, int flags, const char *vfs, sf_db **ou
 /* Register and unregister a named passthrough VFS over an existing SQLite VFS. */
 int sf_vfs_register_passthrough(const char *name, const char *base_name,
                                 int make_default, sf_vfs **out_vfs);
+/* On SQLITE_OK, frees the wrapper and invalidates vfs and all its aliases.
+ * Do not use or unregister that pointer again. On error, the wrapper remains
+ * owned by the caller and unregister may be retried. Active/in-flight files
+ * cause SQLITE_MISUSE; close dependent databases before retrying.
+ * Synchronize unregister with new opens and other uses of this VFS.
+ */
 int sf_vfs_unregister(sf_vfs *vfs);
 const char *sf_db_filename(sf_db *db, const char *schema);
 int sf_table_column_metadata(sf_db *db, const char *schema, const char *table,
