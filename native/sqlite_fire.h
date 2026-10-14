@@ -117,8 +117,10 @@ int sf_vfs_register_passthrough(const char *name, const char *base_name,
 /* On SQLITE_OK, frees the wrapper and invalidates vfs and all its aliases.
  * Do not use or unregister that pointer again. On error, the wrapper remains
  * owned by the caller and unregister may be retried. Active/in-flight files
- * cause SQLITE_MISUSE; close dependent databases before retrying.
- * Synchronize unregister with new opens and other uses of this VFS.
+ * and registered passthrough VFS wrappers based on this wrapper cause
+ * SQLITE_MISUSE; close dependent databases and unregister dependent wrappers
+ * before retrying. Keep an externally supplied base VFS registered and alive.
+ * Synchronize register/unregister with new opens and other uses of this VFS.
  */
 int sf_vfs_unregister(sf_vfs *vfs);
 const char *sf_db_filename(sf_db *db, const char *schema);

@@ -145,6 +145,9 @@ C ABI ma inny kontrakt: udany `sf_vfs_unregister` zwalnia wrapper VFS jednorazow
 i unieważnia wskaźnik oraz wszystkie jego aliasy. Nie wolno ponownie używać tego
 wskaźnika, także do wyrejestrowania. Błąd zachowuje wrapper i pozwala ponowić operację.
 Odmowa przy aktywnej bazie wymaga zamknięcia bazy przed ponowieniem.
+Jeśli inny wrapper passthrough używa tego VFS jako bazy, najpierw wyrejestruj zależny wrapper.
+Zewnętrzny bazowy VFS musi pozostać zarejestrowany i żywy przez cały czas używania wrappera.
+Synchronizuj rejestrację i wyrejestrowanie z otwieraniem baz i innymi operacjami na VFS.
 Wrapper Mojo zapamiętuje udane zamknięcie i nie wywołuje ponownie C ABI.
 
 ## Ograniczenia
