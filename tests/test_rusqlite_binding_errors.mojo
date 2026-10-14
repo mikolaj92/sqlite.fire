@@ -49,6 +49,11 @@ def main() raises:
 
     # Binding and metadata access after close produce SQLITE_MISUSE.
     var closed = db.query("SELECT ?\0")
+    try:
+        closed.bind_null(2)
+        assert False
+    except e:
+        assert error_code(e) == Int(SQLITE_RANGE)
     closed.close()
     try:
         closed.bind_null(1)
