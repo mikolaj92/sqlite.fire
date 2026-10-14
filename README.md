@@ -138,8 +138,9 @@ incremental BLOB-a po zamknięciu właściciela. Jest to obserwowane zachowanie 
 nie ogólna gwarancja wrappera — zalecane jest zamykanie zasobów zależnych przed właścicielem.
 Backup musi zachować oba właścicielskie połączenia otwarte aż do `finish()`.
 
-`close()`/`finish()` są idempotentne. Operacja na zamkniętym wrapperze zgłasza
-`SQLiteError` z kodem `SQLITE_MISUSE`.
+`close()`/`finish()` są idempotentne. Wrapper zgłasza `Error(String(SQLiteError(...)))`;
+`error_code(err)` odczytuje kod SQLite z tekstu błędu.
+Operacja na zamkniętym wrapperze zgłasza kod `SQLITE_MISUSE`.
 
 ## Ograniczenia
 
