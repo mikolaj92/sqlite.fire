@@ -9,6 +9,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 cd "$ROOT"
+uv run --locked --group dev python -m pytest
 python3 tests/test_constant_namespaces.py
 make -C native strict-test
 make -B -C native all

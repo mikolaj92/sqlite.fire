@@ -3,7 +3,7 @@
 Bezpośredni dostęp do systemowego SQLite z Mojo przez mały most C ABI.
 
 Projekt wspiera macOS i Linux, korzysta z systemowego `libsqlite3`. Toolchain
-Mojo jest **pixi** (`mojo == 1.0.0`). `uv` jest tylko dla testów Pythona (`pytest`).
+Mojo jest **pixi** (`mojo == 1.0.0`). Pełna bramka testów wymaga także `uv` do uruchomienia `pytest`.
 
 ## Status
 
@@ -15,7 +15,7 @@ ani fałszywymi callbackami Mojo.
 ## Wymagania i instalacja
 
 - `pixi` (toolchain Mojo **1.0.0**, kanał `https://conda.modular.com/max`)
-- `uv` (opcjonalnie, tylko `pytest`)
+- `uv` (wymagane przez pełną bramkę testów)
 - systemowa biblioteka SQLite (`libsqlite3`)
 - macOS albo Linux
 
@@ -195,15 +195,15 @@ Szybki przykład produktu:
 pixi run smoke
 ```
 
-Jedno kanoniczne zadanie `test` uruchamia kontrakt nazw (`SQLITE_BUSY` vs
-`SQLITE_NULL_TYPE`), pełną suite Mojo oraz natywne testy strict:
+Jedno kanoniczne zadanie `test` uruchamia wszystkie testy Pythona przez `pytest`,
+kontrakt nazw (`SQLITE_BUSY` vs `SQLITE_NULL_TYPE`), natywne testy strict i pełną suite Mojo:
 
 ```sh
 pixi run test
 ```
 
-`[tool.lokay] test` wskazuje to samo zadanie. Opcjonalne `uv run pytest` powtarza
-pin toolchainu i kontrakt nazw i nie zastępuje pełnej suite Mojo.
+`[tool.lokay] test` wskazuje to samo zadanie. Runner wymaga `uv` i uruchamia
+`uv run --locked --group dev python -m pytest`; błąd dowolnego etapu przerywa bramkę.
 
 Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
 ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu.
