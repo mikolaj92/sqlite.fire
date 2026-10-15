@@ -14,6 +14,10 @@ ani fałszywymi callbackami Mojo.
 
 ## Wymagania i instalacja
 
+To biblioteka Mojo z mostem C, nie dystrybucja Pythona ani wheel.
+Nie używaj `pip install .` ani `uv build` — te ścieżki nie są wspierane.
+Używaj pixi; most C buduje `make -C native`, a importy Mojo wymagają `-I src`.
+
 - `pixi` (toolchain Mojo **1.0.0**, kanał `https://conda.modular.com/max`)
 - `uv` (wymagane przez pełną bramkę testów)
 - systemowa biblioteka SQLite (`libsqlite3`)
