@@ -219,7 +219,7 @@ Sanitizery są dostępne lokalnie przez `make -C native sanitize`.
 Suite Mojo obejmuje kontrakty inspirowane CPython `sqlite3`, rusqlite i go-sqlite3:
 transakcje i rollback, autocommit, `ROW`/`DONE`, bindingi, NULL/TEXT/BLOB, błędy zakresu
 i constraint, URI, WAL, blokady, triggers, foreign keys, stress reuse statementów,
-zasoby zależne, niezależne połączenia, callbacki i lifecycle VFS. Strict native suite
+zasoby zależne, niezależne połączenia i lifecycle VFS. Strict native suite
 obejmuje osobno callbacki i passthrough VFS.
 
 ## Układ projektu
