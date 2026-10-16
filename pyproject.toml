@@ -10,9 +10,6 @@ authors = [
 ]
 dependencies = []
 
-[project.optional-dependencies]
-dev = ["pytest>=8.0"]
-
 [dependency-groups]
 dev = [
     "pytest>=8.0",
