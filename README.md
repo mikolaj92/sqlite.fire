@@ -1,243 +1,243 @@
 # sqlite.fire
 
-Bezpośredni dostęp do systemowego SQLite z Mojo przez mały most C ABI.
+Direct access to system SQLite from Mojo through a small C ABI bridge.
 
-Projekt wspiera macOS i Linux, korzysta z systemowego `libsqlite3`. Toolchain
-Mojo jest **pixi** (`mojo == 1.0.0`). Pełna bramka testów wymaga także `uv` do uruchomienia `pytest`.
+The project supports macOS and Linux and uses the system `libsqlite3`. The Mojo
+toolchain uses **pixi** (`mojo == 1.0.0`). The full test gate also requires `uv` to run `pytest`.
 
 ## Status
 
-Rdzeń biblioteki, rozszerzone API SQLite, obsługa zasobów, testy kontraktowe i natywny
-most C ABI są zaimplementowane. Najważniejsze ograniczenia opisano w sekcji
-[Ograniczenia](#ograniczenia); nie są one ukrywane za niebezpiecznymi fallbackami
-ani fałszywymi callbackami Mojo.
+The library core, extended SQLite API, resource management, contract tests, and native
+C ABI bridge are implemented. The main limitations are described in
+[Limitations](#limitations); they are not hidden behind unsafe fallbacks
+or fake Mojo callbacks.
 
-## Wymagania i instalacja
+## Requirements and installation
 
-To biblioteka Mojo z mostem C, nie dystrybucja Pythona ani wheel.
-Nie używaj `pip install .` ani `uv build` — te ścieżki nie są wspierane.
-Używaj pixi; most C buduje `make -C native`, a importy Mojo wymagają `-I src`.
+This is a Mojo library with a C bridge, not a Python distribution or wheel.
+Do not use `pip install .` or `uv build` — these paths are not supported.
+Use pixi; `make -C native` builds the C bridge, and Mojo imports require `-I src`.
 
-- `pixi` (toolchain Mojo **1.0.0**, kanał `https://conda.modular.com/max`)
-- `uv` (wymagane przez pełną bramkę testów)
-- systemowa biblioteka SQLite (`libsqlite3`)
-- macOS albo Linux
+- `pixi` (Mojo **1.0.0** toolchain, `https://conda.modular.com/max` channel)
+- `uv` (required by the full test gate)
+- system SQLite library (`libsqlite3`)
+- macOS or Linux
 
 ```sh
 pixi install
 pixi run test
 ```
 
-Bibliotekę natywną buduje runner testów. Przykład uruchamia zadanie smoke:
+The test runner builds the native library. The smoke task runs the example:
 
 ```sh
 pixi run smoke
 ```
 
-Na macOS powstaje `native/libsqlite_fire.dylib`, a na Linuxie
-`native/libsqlite_fire.so`. Wrapper znajduje most przez jeden kontrakt:
-`SQLITE_FIRE_LIBRARY` może wskazać istniejący plik absolutną ścieżką, a bez tej
-zmiennej systemowy loader szuka `libsqlite_fire.dylib` albo `libsqlite_fire.so`.
-Runner ustawia `SQLITE_FIRE_LIBRARY` automatycznie. Żadna ścieżka nie zależy od
-bieżącego katalogu procesu.
+The build produces `native/libsqlite_fire.dylib` on macOS and
+`native/libsqlite_fire.so` on Linux. The wrapper locates the bridge through a single contract:
+`SQLITE_FIRE_LIBRARY` can specify an existing file by its absolute path; without this
+variable, the system loader searches for `libsqlite_fire.dylib` or `libsqlite_fire.so`.
+The runner sets `SQLITE_FIRE_LIBRARY` automatically. No path depends on
+the process's current directory.
 
-## Co jest zaimplementowane
+## What is implemented
 
-### Podstawowe API Mojo
+### Core Mojo API
 
-`sqlite_fire` eksportuje:
+`sqlite_fire` exports:
 
-- `Connection` i `Statement` z jawnym, idempotentnym `close()`;
-- `SQLiteError` z kodem SQLite i komunikatem;
-- `OpenOptions` dla `sqlite3_open_v2` oraz wyboru VFS;
-- `SQLiteValue` dla SQL `NULL`, INTEGER, REAL, TEXT i BLOB;
-- `Row` jako posiadana kopia bieżącego wiersza z dostępem po indeksie, nazwie i
-  wyszukiwaniem przez `index()`;
-- `Row` oferuje też typowane gettery `integer()`, `real()`, `text()`, `blob()` i
-  `is_null()` oraz warianty nazwane `integer_by_name()`, `real_by_name()`,
-  `text_by_name()`, `blob_by_name()` i `is_null_by_name()`; niezgodny typ zgłasza
-  `SQLITE_MISUSE` zamiast cichej konwersji;
-- prepared statements, bindingi pozycyjne i nazwane, `bind_value()`/`column_value()`,
-  `reset()` oraz `clear_bindings()`;
-- walidowane `Savepoint` z `savepoint()`, `rollback_to()` i `release()`;
-- wysokopoziomowe `fetch_all()`, `fetch_one()` i `fetch_value()` zwracające posiadane
-  kopie wyników; brak wiersza w `fetch_one()` zgłasza `SQLITE_NOTFOUND`;
-- odczyt typów, kolumn, metadanych zapytania i kopii danych BLOB;
-- transakcje (`begin`, `begin_immediate`, `begin_exclusive`, `commit`, `rollback`),
-  autocommit, changes, last-insert-rowid, total changes i busy timeout;
-- interrupt, limity SQLite (`limit`/`get_limit`), nazwę pliku i metadane kolumny tabeli;
-- akceptowanie końcowych komentarzy i białych znaków, przy odrzucaniu wielu
-  instrukcji w jednym `prepare()`;
+- `Connection` and `Statement` with explicit, idempotent `close()`;
+- `SQLiteError` with a SQLite code and message;
+- `OpenOptions` for `sqlite3_open_v2` and VFS selection;
+- `SQLiteValue` for SQL `NULL`, INTEGER, REAL, TEXT, and BLOB;
+- `Row` as an owned copy of the current row with access by index, name, and
+  lookup through `index()`;
+- `Row` also provides typed getters `integer()`, `real()`, `text()`, `blob()`, and
+  `is_null()` and named variants `integer_by_name()`, `real_by_name()`,
+  `text_by_name()`, `blob_by_name()`, and `is_null_by_name()`; a type mismatch raises
+  `SQLITE_MISUSE` instead of silently converting;
+- prepared statements, positional and named bindings, `bind_value()`/`column_value()`,
+  `reset()`, and `clear_bindings()`;
+- validated `Savepoint` with `savepoint()`, `rollback_to()`, and `release()`;
+- high-level `fetch_all()`, `fetch_one()`, and `fetch_value()` returning owned
+  copies of results; a missing row in `fetch_one()` raises `SQLITE_NOTFOUND`;
+- access to types, columns, query metadata, and copies of BLOB data;
+- transactions (`begin`, `begin_immediate`, `begin_exclusive`, `commit`, `rollback`),
+  autocommit, changes, last-insert-rowid, total changes, and busy timeout;
+- interrupt, SQLite limits (`limit`/`get_limit`), filename, and table column metadata;
+- acceptance of trailing comments and whitespace, while rejecting multiple
+  statements in a single `prepare()`;
 
-Publiczny wrapper Mojo obejmuje wymienione funkcje; pozostałe możliwości SQLite są dostępne
-tylko przez natywny C ABI albo nie są obsługiwane.
+The public Mojo wrapper covers the listed features; other SQLite capabilities are available
+only through the native C ABI or are not supported.
 
-Dane użytkownika należy przekazywać przez prepared statements i bindingi. Interpolacja
-wartości do SQL nie jest obsługiwana jako bezpieczny mechanizm.
+Pass user data through prepared statements and bindings. Interpolating
+values into SQL is not supported as a safe mechanism.
 
-`OpenOptions` domyślnie używa `SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI`.
-`SQLiteValue` zachowuje rozróżnienie między SQL `NULL`, pustym tekstem i pustym BLOB-em.
-Kody wyniku (`SQLITE_ERROR`, `SQLITE_BUSY`, …) i kody typów kolumn (`SQLITE_INTEGER_TYPE`,
-`SQLITE_NULL_TYPE`, …) to osobne rodziny nazw. SQLite w C używa tych samych liczb (`1` i `5`)
-w dwóch rodzinach makr; `error_code()` porównuj tylko z kodami wyniku, a `column_type()` / `kind`
-tylko z `SQLITE_*_TYPE`. Nie porównuj ich krzyżowo. To rozdział nazw, nie statycznych typów:
-stałe nadal mają typ `Int32`. Dotychczasowe importy typów kolumn (`SQLITE_INTEGER`,
-`SQLITE_REAL`, `SQLITE_TEXT`, `SQLITE_BLOB`, `SQLITE_NULL`) należy zmienić na nazwy
-z sufiksem `_TYPE`; nazwy kodów wyniku i ABI C pozostają bez zmian.
-`serialize()` zwraca skopiowane dane Mojo; flaga `SQLITE_SERIALIZE_NOCOPY` jest odrzucana.
-`PassthroughVFS` należy zamknąć dopiero po zamknięciu wszystkich baz otwartych z jego nazwą.
+`OpenOptions` defaults to `SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI`.
+`SQLiteValue` preserves the distinction between SQL `NULL`, empty text, and an empty BLOB.
+Result codes (`SQLITE_ERROR`, `SQLITE_BUSY`, …) and column type codes (`SQLITE_INTEGER_TYPE`,
+`SQLITE_NULL_TYPE`, …) are separate name families. SQLite in C uses the same numbers (`1` and `5`)
+in two macro families; compare `error_code()` only with result codes, and `column_type()` / `kind`
+only with `SQLITE_*_TYPE`. Do not compare across families. This separates names, not static types:
+the constants still have type `Int32`. Existing column type imports (`SQLITE_INTEGER`,
+`SQLITE_REAL`, `SQLITE_TEXT`, `SQLITE_BLOB`, `SQLITE_NULL`) must be changed to names
+with the `_TYPE` suffix; result code names and the C ABI remain unchanged.
+`serialize()` returns copied Mojo data; the `SQLITE_SERIALIZE_NOCOPY` flag is rejected.
+Close `PassthroughVFS` only after closing all databases opened with its name.
 
-### Rozszerzone API
+### Extended API
 
-`sqlite_fire` eksportuje także:
+`sqlite_fire` also exports:
 
-- `AdvancedDatabase` — własność bazy albo pożyczony widok utworzony z `Connection`;
-- `IncrementalBlob` — odczyt, zapis, reopen, rozmiar i idempotentne zamknięcie;
-- `Backup` — step, page count, remaining i idempotentne `finish()`;
-- serializację i deserializację bazy z kopiowaniem danych do pamięci Mojo;
-- interrupt i limity na poziomie `AdvancedDatabase`;
-- `PassthroughVFS` — nazwany VFS delegujący do istniejącego systemowego VFS.
+- `AdvancedDatabase` — an owned database or a borrowed view created from `Connection`;
+- `IncrementalBlob` — read, write, reopen, size, and idempotent close;
+- `Backup` — step, page count, remaining, and idempotent `finish()`;
+- database serialization and deserialization with data copied into Mojo memory;
+- interrupt and limits at the `AdvancedDatabase` level;
+- `PassthroughVFS` — a named VFS delegating to an existing system VFS.
 
-`IncrementalBlob` i `Backup` pożyczają bazę. Wszystkie zależne zasoby muszą zostać
-zamknięte przed zamknięciem ich właściciela. `AdvancedDatabase(Connection)` nie zamyka
-połączenia; właścicielski `Connection` musi pozostać otwarty przez cały czas życia widoku
-i utworzonych przez niego zasobów.
+`IncrementalBlob` and `Backup` borrow the database. All dependent resources must be
+closed before their owner is closed. `AdvancedDatabase(Connection)` does not close
+the connection; the owning `Connection` must remain open for the lifetime of the view
+and the resources it creates.
 
 ### Native C ABI
 
-`native/sqlite_fire.h` i `native/sqlite_fire.c` udostępniają:
+`native/sqlite_fire.h` and `native/sqlite_fire.c` provide:
 
-- otwieranie (`sf_open`, `sf_open_options`), diagnostykę, metadane bazy i kolumn,
-  interrupt, limity oraz wszystkie podstawowe operacje statementów;
-- incremental BLOB, backup, `sf_serialize`/`sf_serialize_status`, deserialize i `sf_free`;
-- tokenizowane `sf_register_scalar_function`/`sf_register_collation` z jednym
-  kanonicznym lifecycle przez idempotentne `sf_callback_token_close`;
-- authorizer, progress, trace, update, commit, rollback, WAL i busy hooks;
-- rejestrację i wyrejestrowanie passthrough VFS;
-- `sf_enable_load_extension` i `sf_load_extension` na platformach z dynamicznym loaderem;
-- oryginalne liczbowe kody wyniku SQLite bez zastępowania ich ogólnym błędem; kody wyniku
-  (`sf_errcode`, `sf_step`) nie są kodami typów kolumn (`sf_column_type` /
+- opening (`sf_open`, `sf_open_options`), diagnostics, database and column metadata,
+  interrupt, limits, and all core statement operations;
+- incremental BLOB, backup, `sf_serialize`/`sf_serialize_status`, deserialize, and `sf_free`;
+- token-based `sf_register_scalar_function`/`sf_register_collation` with a single
+  canonical lifecycle through idempotent `sf_callback_token_close`;
+- authorizer, progress, trace, update, commit, rollback, WAL, and busy hooks;
+- passthrough VFS registration and unregistration;
+- `sf_enable_load_extension` and `sf_load_extension` on platforms with a dynamic loader;
+- original numeric SQLite result codes without replacing them with a generic error; result codes
+  (`sf_errcode`, `sf_step`) are not column type codes (`sf_column_type` /
   `sqlite3_column_type`).
 
-Callbacki natywne otrzymują synchroniczne wskaźniki SQLite i są przeznaczone dla kodu C.
-`userdata` pozostaje własnością wywołującego i musi żyć przez cały czas rejestracji;
-most nie zwalnia tego wskaźnika. Token callbacku dezaktywuje callback przed wyrejestrowaniem,
-a jego `close` jest idempotentne. Zamknięty token pozostaje nieaktywnym tombstone’em i nie
-jest obecnie zwalniany, aby kolejne wywołanie `close` było bezpieczne.
+Native callbacks receive synchronous SQLite pointers and are intended for C code.
+`userdata` remains owned by the caller and must live for the entire registration;
+the bridge does not free this pointer. A callback token deactivates the callback before unregistration,
+and its `close` is idempotent. A closed token remains an inactive tombstone and is not
+currently freed, so another `close` call is safe.
 
-## Współbieżność i własność zasobów
+## Concurrency and resource ownership
 
-Wspierany model współbieżności to **jedno niezależnie posiadane `Connection` na worker**.
-Każde połączenie ma własny uchwyt SQLite. Osobne połączenia `:memory:` są osobnymi bazami;
-dla współdzielonego stanu należy użyć wspólnego pliku albo URI i pozostawić blokowanie
-plików SQLite.
+The supported concurrency model is **one independently owned `Connection` per worker**.
+Each connection has its own SQLite handle. Separate `:memory:` connections are separate databases;
+for shared state, use a common file or URI and retain SQLite's
+file locking.
 
-`Connection` i `Statement` są mutowalnymi właścicielami zasobów. Wrapper nie dodaje
-blokad, więc współdzielenie jednego połączenia lub statementu wymaga zewnętrznej
-synchronizacji dla każdej operacji i całego czasu życia zasobu. Callbacki nie mogą
-bezpiecznie wykonywać reentrantnych operacji na tej samej bazie.
+`Connection` and `Statement` are mutable resource owners. The wrapper does not add
+locks, so sharing a connection or statement requires external
+synchronization for every operation and the entire resource lifetime. Callbacks cannot
+safely perform reentrant operations on the same database.
 
-`sqlite3_close_v2` pozwala w testowanej konfiguracji dokończyć użycie statementu i
-incremental BLOB-a po zamknięciu właściciela. Jest to obserwowane zachowanie SQLite,
-nie ogólna gwarancja wrappera — zalecane jest zamykanie zasobów zależnych przed właścicielem.
-Backup musi zachować oba właścicielskie połączenia otwarte aż do `finish()`.
+In the tested configuration, `sqlite3_close_v2` allows continued use of a statement and
+incremental BLOB after closing the owner. This is observed SQLite behavior,
+not a general wrapper guarantee — closing dependent resources before the owner is recommended.
+Backup must keep both owning connections open until `finish()`.
 
-`close()`/`finish()` są idempotentne. Wrapper zgłasza `Error(String(SQLiteError(...)))`;
-`error_code(err)` odczytuje kod SQLite z tekstu błędu.
-Operacja na zamkniętym wrapperze zgłasza kod `SQLITE_MISUSE`.
+`close()`/`finish()` are idempotent. The wrapper raises `Error(String(SQLiteError(...)))`;
+`error_code(err)` reads the SQLite code from the error text.
+An operation on a closed wrapper raises `SQLITE_MISUSE`.
 
-## Ograniczenia
+## Limitations
 
-Legenda: `[x]` dostępne i opisane; `[ ]` brakujące, wyłączone albo ograniczone.
+Legend: `[x]` available and documented; `[ ]` missing, disabled, or limited.
 
-- [x] Podstawowe API Mojo, rozszerzone API oraz passthrough VFS są dostępne na macOS i Linux.
-- [x] Natywny C ABI udostępnia także bezpośrednią serializację z flagami (w tym `NOCOPY`)
-  oraz ładowanie rozszerzeń; te funkcje nie są równoważne z bezpiecznym wrapperem Mojo.
-- [ ] **Callbacki Mojo → C.** Zweryfikowane z Mojo **1.0.0**:
-  `def(... ) thin abi("C")` działa jako typ funkcji importowanej z biblioteki, ale
-  przekazanie funkcji Mojo do tego typu nie działa bezpiecznie. Wariant bez `thin`
-  odrzuca konwersję podczas kompilacji, `escaping` jest odrzucone przez parser, a
-  wywołanie funkcji eksportowanej jako callback kończy się crashem. Callbacki są więc
-  dostępne tylko przez natywny C ABI.
-- [ ] **Mojo scalar/window/aggregate functions.** Rejestracja funkcji użytkownika z Mojo
-  wymaga rozwiązania problemu callbacków z poprzedniego punktu.
-- [ ] **Własny VFS z implementacją I/O w Mojo/C.** Dostępny jest passthrough VFS
-  delegujący do istniejącego VFS; arbitralne implementacje `sqlite3_io_methods` nie są
-  częścią publicznego API.
-- [ ] **Ładowanie rozszerzeń z Mojo.** `enable_load_extension(True)` pozostaje celowo
-  wyłączone z powodu crasha w obecnym runtime Mojo. `False` jest bezpieczne, a
-  `load_extension()` zgłasza `SQLITE_MISUSE`, gdy ładowanie jest wyłączone. Natywne
-  `sf_enable_load_extension`/`sf_load_extension` działają na macOS/Linux, ale pozostają
-  API C-only i nie są dostępne jako bezpieczny mechanizm Mojo.
-- [ ] **Pełna obsługa innych platform.** Źródła i runner wspierają wyłącznie macOS i Linux;
-  inne targety nie mają dostarczonej biblioteki SQLite fire.
-- [ ] **Pełne testy natywnego ABI.** Strict native tests obejmują obecnie callbacki i VFS;
-  pozostałe C-only operacje są pokrywane głównie przez testy Mojo lub nie mają osobnych
-  testów C. ASan/UBSan uruchamiają te same dwa natywne testy lokalnie.
-- [ ] **Współbieżny unregister VFS.** Wyrejestrowanie odrzuca aktywne/in-flight pliki;
-  równoczesne rozpoczynanie nowych otwarć i unregister wymaga zewnętrznej synchronizacji.
-- [ ] **Odzyskiwanie tokenów callbacków.** Dla bezpieczeństwa powtórnego `close` zamknięte
-  tokeny pozostają tombstone’ami; ich alokacja nie jest obecnie odzyskiwana.
+- [x] The core Mojo API, extended API, and passthrough VFS are available on macOS and Linux.
+- [x] The native C ABI also provides direct serialization with flags (including `NOCOPY`)
+  and extension loading; these features are not equivalent to the safe Mojo wrapper.
+- [ ] **Mojo → C callbacks.** Verified with Mojo **1.0.0**:
+  `def(... ) thin abi("C")` works as the type of a function imported from a library, but
+  passing a Mojo function to this type does not work safely. The variant without `thin`
+  rejects the conversion at compile time, `escaping` is rejected by the parser, and
+  calling an exported function as a callback crashes. Callbacks are therefore
+  available only through the native C ABI.
+- [ ] **Mojo scalar/window/aggregate functions.** Registering user-defined functions from Mojo
+  requires resolving the callback issue in the previous item.
+- [ ] **Custom VFS with I/O implemented in Mojo/C.** A passthrough VFS
+  delegating to an existing VFS is available; arbitrary `sqlite3_io_methods` implementations are not
+  part of the public API.
+- [ ] **Extension loading from Mojo.** `enable_load_extension(True)` remains intentionally
+  disabled because of a crash in the current Mojo runtime. `False` is safe, and
+  `load_extension()` raises `SQLITE_MISUSE` when loading is disabled. Native
+  `sf_enable_load_extension`/`sf_load_extension` work on macOS/Linux, but remain
+  C-only APIs and are not available as a safe Mojo mechanism.
+- [ ] **Full support for other platforms.** The sources and runner support only macOS and Linux;
+  other targets do not have a supplied SQLite fire library.
+- [ ] **Full native ABI tests.** Strict native tests currently cover callbacks and VFS;
+  other C-only operations are covered mainly by Mojo tests or have no separate
+  C tests. ASan/UBSan run the same two native tests locally.
+- [ ] **Concurrent VFS unregistration.** Unregistration rejects active/in-flight files;
+  starting new opens concurrently with unregistration requires external synchronization.
+- [ ] **Callback token reclamation.** To keep repeated `close` safe, closed
+  tokens remain tombstones; their allocations are not currently reclaimed.
 
-Współdzielenie uchwytów bez synchronizacji oraz reentrancy callbacków na tej samej bazie
-nie są gwarancjami biblioteki. Zamykanie właściciela przed zależnymi zasobami również nie
-jest zalecane; zachowanie po `sqlite3_close_v2` opisano wyżej jako obserwację, nie kontrakt.
+Sharing handles without synchronization and callback reentrancy on the same database
+are not library guarantees. Closing the owner before dependent resources is also not
+recommended; behavior after `sqlite3_close_v2` is described above as an observation, not a contract.
 
-## Uruchomienie przykładu
-
-```sh
-pixi run smoke
-```
-
-Przykład jawnie zamyka statementy i połączenie.
-
-## Testy
-
-Szybki przykład produktu:
+## Running the example
 
 ```sh
 pixi run smoke
 ```
 
-Jedno kanoniczne zadanie `test` uruchamia wszystkie testy Pythona przez `pytest`,
-kontrakt nazw (`SQLITE_BUSY` vs `SQLITE_NULL_TYPE`), natywne testy strict i pełną suite Mojo:
+The example explicitly closes statements and the connection.
+
+## Tests
+
+Quick product example:
+
+```sh
+pixi run smoke
+```
+
+One canonical `test` task runs all Python tests through `pytest`,
+the name contract (`SQLITE_BUSY` vs `SQLITE_NULL_TYPE`), strict native tests, and the full Mojo suite:
 
 ```sh
 pixi run test
 ```
 
-`[tool.lokay] test` wskazuje to samo zadanie. Runner wymaga `uv` i uruchamia
-`uv run --locked --group dev python -m pytest`; błąd dowolnego etapu przerywa bramkę.
+`[tool.lokay] test` points to the same task. The runner requires `uv` and runs
+`uv run --locked --group dev python -m pytest`; failure at any stage stops the gate.
 
-Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
-ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu.
+The runner builds each test into a unique temporary directory, sets the correct library
+loading path for macOS/Linux, and cleans up artifacts on completion.
 
-Testy Pythona osobno:
+Python tests separately:
 
 ```sh
 uv run --group dev pytest
 ```
 
-Ręczne testy natywnego ABI:
+Manual native ABI tests:
 
 ```sh
 make -C native strict-test
 ```
 
-Sanitizery są dostępne lokalnie przez `make -C native sanitize`.
+Sanitizers are available locally through `make -C native sanitize`.
 
-Suite Mojo obejmuje kontrakty inspirowane CPython `sqlite3`, rusqlite i go-sqlite3:
-transakcje i rollback, autocommit, `ROW`/`DONE`, bindingi, NULL/TEXT/BLOB, błędy zakresu
-i constraint, URI, WAL, blokady, triggers, foreign keys, stress reuse statementów,
-zasoby zależne, niezależne połączenia i lifecycle VFS. Strict native suite
-obejmuje osobno callbacki i passthrough VFS.
+The Mojo suite covers contracts inspired by CPython `sqlite3`, rusqlite, and go-sqlite3:
+transactions and rollback, autocommit, `ROW`/`DONE`, bindings, NULL/TEXT/BLOB, range
+and constraint errors, URI, WAL, locking, triggers, foreign keys, statement reuse stress,
+dependent resources, independent connections, and the VFS lifecycle. The strict native suite
+covers callbacks and passthrough VFS separately.
 
-## Układ projektu
+## Project layout
 
-- `src/sqlite_fire/sqlite.mojo` — podstawowy wrapper Mojo;
-- `src/sqlite_fire/advanced.mojo` — BLOB, backup, serializacja, VFS i rozszerzone API;
-- `src/sqlite_fire/__init__.mojo` — publiczne eksporty;
-- `native/sqlite_fire.h` — publiczny C ABI;
-- `native/sqlite_fire.c` — implementacja mostu do systemowego SQLite;
-- `tests/` — testy Mojo i natywne testy C;
-- `examples/basic.mojo` — minimalny przykład użycia.
+- `src/sqlite_fire/sqlite.mojo` — core Mojo wrapper;
+- `src/sqlite_fire/advanced.mojo` — BLOB, backup, serialization, VFS, and extended API;
+- `src/sqlite_fire/__init__.mojo` — public exports;
+- `native/sqlite_fire.h` — public C ABI;
+- `native/sqlite_fire.c` — bridge implementation for system SQLite;
+- `tests/` — Mojo tests and native C tests;
+- `examples/basic.mojo` — minimal usage example.
