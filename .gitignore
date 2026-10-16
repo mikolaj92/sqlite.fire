@@ -16,3 +16,4 @@ __mojocache__/
 .pytest_cache/
 native/.native-tests/
 dist/
+.lokay/
