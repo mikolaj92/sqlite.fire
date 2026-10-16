@@ -3,7 +3,7 @@
 Direct access to system SQLite from Mojo through a small C ABI bridge.
 
 The project supports macOS and Linux and uses the system `libsqlite3`. The Mojo
-toolchain uses **pixi** (`mojo == 1.0.0`). The full test gate also requires `uv` to run `pytest`.
+toolchain is managed by **pixi** (`mojo == 1.0.0`). The full test gate also requires `uv` to run `pytest`.
 
 ## Status
 
