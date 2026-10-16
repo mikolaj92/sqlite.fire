@@ -212,6 +212,12 @@ pixi run test
 Runner buduje każdy test do unikalnego katalogu tymczasowego, ustawia właściwą ścieżkę
 ładowania biblioteki dla macOS/Linux i sprząta artefakty po zakończeniu.
 
+Testy Pythona osobno:
+
+```sh
+uv run --group dev pytest
+```
+
 Ręczne testy natywnego ABI:
 
 ```sh
